@@ -5,20 +5,15 @@ import {
   Card,
   CardAction,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { TrendingUpIcon, TrendingDownIcon } from "lucide-react";
-import { z } from "zod";
-import { ProductSchema } from "@/schemas/";
-import { useMemo } from "react";
-import { getProducts, getTotalRevenue } from "@/app/queries";
+import { getProducts, getTotalRevenue } from "@/hooks/queries";
 
 export function SectionCards() {
   const totalProductsQuery = getProducts();
   const totalRevenue = getTotalRevenue();
-
   const totalProducts = totalProductsQuery.data?.count;
 
   return (

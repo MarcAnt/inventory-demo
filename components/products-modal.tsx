@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Field,
+  FieldContent,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -23,25 +24,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
-import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { ProductSchema } from "@/schemas";
-import type { Category } from "@/types";
+import type { Category, Products, Suppliers } from "@/types";
+import { createProduct } from "@/hooks/queries";
+import { Switch } from "@/components/ui/switch";
+import { useId } from "react";
 
-type ProductOmitId = Omit<z.infer<typeof ProductSchema>, "id">;
+type ProductOmitId = Omit<Products, "id">;
 
 type Props = {
   open: boolean;
   setIsOpen: (open: boolean) => void;
   categories: Category[];
+  suppliers: Suppliers[];
 };
 
-export const ProductsModal = ({ categories, open, setIsOpen }: Props) => {
-  const supabase = createClient();
-
+export const ProductsModal = ({
+  categories,
+  suppliers,
+  open,
+  setIsOpen,
+}: Props) => {
   const defaultValue: ProductOmitId = {
     name: "",
     price: 0,
@@ -51,8 +57,10 @@ export const ProductsModal = ({ categories, open, setIsOpen }: Props) => {
     category_id: 0,
     supplier_id: 0,
     barcode: 0,
-    status: "ACTIVO",
+    status: "ACTIVE",
   };
+
+  const formId = useId();
 
   const form = useForm({
     resolver: zodResolver(ProductSchema.omit({ id: true })),
@@ -60,11 +68,12 @@ export const ProductsModal = ({ categories, open, setIsOpen }: Props) => {
     mode: "onChange",
   });
 
+  const addProductMutation = createProduct();
+
   const onSubmit = async (data: ProductOmitId) => {
     try {
-      const parsed = await ProductSchema.omit({ id: true }).parseAsync(data);
+      await addProductMutation.mutateAsync(data);
 
-      await supabase.from("products").insert([parsed]);
       toast.success("Producto agregado exitosamente");
       form.reset();
       setIsOpen(false);
@@ -76,13 +85,53 @@ export const ProductsModal = ({ categories, open, setIsOpen }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={setIsOpen}>
-      <form onSubmit={form.handleSubmit(onSubmit)} id="add-product-form">
-        <DialogContent className="sm:max-w-sm">
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        id={`${formId}-add-product-form`}
+      >
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Agregar Producto</DialogTitle>
             <DialogDescription>
               Agrega un producto al inventario.
             </DialogDescription>
+
+            <FieldGroup>
+              <Controller
+                control={form.control}
+                name="status"
+                render={({ field, fieldState }) => {
+                  const isChecked = field.value === "ACTIVE";
+                  const toggleChecked = () => {
+                    field.onChange(isChecked ? "INACTIVE" : "ACTIVE");
+                  };
+                  return (
+                    <Field
+                      orientation="horizontal"
+                      data-invalid={fieldState.invalid}
+                    >
+                      <FieldContent className="flex flex-row items-center justify-end">
+                        <FieldLabel>
+                          Estado del producto. Si el producto esta inactivo no
+                          se podra vender pero aparecera en la lista de
+                          productos.
+                        </FieldLabel>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={isChecked}
+                            onCheckedChange={toggleChecked}
+                          />
+                          {isChecked ? "Activo" : "Inactivo"}
+                        </div>
+                      </FieldContent>
+                      {fieldState.invalid && (
+                        <FieldError errors={[fieldState.error]} />
+                      )}
+                    </Field>
+                  );
+                }}
+              />
+            </FieldGroup>
           </DialogHeader>
 
           <FieldGroup>
@@ -137,7 +186,7 @@ export const ProductsModal = ({ categories, open, setIsOpen }: Props) => {
                   <FieldLabel htmlFor={field.name}>Código de barras</FieldLabel>
                   <Input
                     {...field}
-                    value={field.value ?? ""}
+                    value={String(field.value ?? "")}
                     id={field.name}
                     aria-invalid={fieldState.invalid}
                     placeholder="Código de barras"
@@ -172,6 +221,7 @@ export const ProductsModal = ({ categories, open, setIsOpen }: Props) => {
                         <SelectValue placeholder="Selecciona una categoría" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem>Sin categoría</SelectItem>
                         {categories.map((category) => {
                           return (
                             <SelectItem
@@ -179,6 +229,49 @@ export const ProductsModal = ({ categories, open, setIsOpen }: Props) => {
                               value={String(category.id)}
                             >
                               {category.name}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                );
+              }}
+            />
+
+            <Controller
+              name="supplier_id"
+              control={form.control}
+              render={({ field, fieldState }) => {
+                return (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="category_id">Proveedor</FieldLabel>
+                    <Select
+                      name={"supplier_id"}
+                      onValueChange={field.onChange}
+                      aria-invalid={fieldState.invalid}
+                      value={field.value ? String(field.value) : ""}
+                      items={suppliers.map((s) => ({
+                        label: s.name,
+                        value: String(s.id),
+                      }))}
+                    >
+                      <SelectTrigger id="supplier_id">
+                        <SelectValue placeholder="Selecciona un proveedor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem>Sin proveedor</SelectItem>
+                        {suppliers.map((supplier) => {
+                          return (
+                            <SelectItem
+                              key={supplier.id}
+                              value={String(supplier.id)}
+                            >
+                              {supplier.name}
                             </SelectItem>
                           );
                         })}
@@ -233,6 +326,7 @@ export const ProductsModal = ({ categories, open, setIsOpen }: Props) => {
                     type="number"
                     value={field.value ?? 0}
                     id={field.name}
+                    min={0}
                     aria-invalid={fieldState.invalid}
                     placeholder="Stock Actual"
                     autoComplete="off"
@@ -258,6 +352,7 @@ export const ProductsModal = ({ categories, open, setIsOpen }: Props) => {
                     type="number"
                     value={field.value ?? 0}
                     id={field.name}
+                    min={0}
                     aria-invalid={fieldState.invalid}
                     placeholder="Stock Mínimo"
                     autoComplete="off"
@@ -279,7 +374,7 @@ export const ProductsModal = ({ categories, open, setIsOpen }: Props) => {
             </DialogClose>
             <Button
               type="submit"
-              form="add-product-form"
+              form={`${formId}-add-product-form`}
               disabled={form.formState.isSubmitting}
             >
               Crear

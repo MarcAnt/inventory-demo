@@ -1,6 +1,7 @@
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NavUser } from "./nav-user";
+import { ModeToggle } from "./mode-toggle";
 
 const data = {
   user: {
@@ -30,6 +31,7 @@ export function SiteHeader() {
             >
             </a>
           </Button> */}
+          <ModeToggle />
           <NavUser user={data.user} />
         </div>
       </div>

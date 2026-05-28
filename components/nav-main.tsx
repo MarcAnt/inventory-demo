@@ -23,7 +23,7 @@ export function NavMain({
   }[];
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const { categories } = useSidebar();
+  const { categories, suppliers } = useSidebar();
 
   return (
     <>
@@ -65,6 +65,7 @@ export function NavMain({
         open={isOpen}
         setIsOpen={setIsOpen}
         categories={categories || []}
+        suppliers={suppliers || []}
       />
     </>
   );

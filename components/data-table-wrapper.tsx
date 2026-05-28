@@ -1,63 +1,70 @@
-// app/dashboard/page.tsx
-import {
-  QueryClient,
-  dehydrate,
-  HydrationBoundary,
-} from "@tanstack/react-query";
-// import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+"use client";
 
-export default async function DataTableWrapper({
-  children,
+import { DataTable } from "./data-table";
+import { getProducts, getCategories, getSuppliers } from "@/hooks/queries";
+import { Category, Products, Suppliers } from "@/types";
+import { createClient } from "@/utils/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+
+function DataTableWrapper({
+  initialProducts,
+  initialCategories,
+  initialSuppliers,
 }: {
-  children: React.ReactNode;
+  initialProducts: { data: Products[]; count: number | null };
+  initialCategories: Category[];
+  initialSuppliers: Suppliers[];
 }) {
-  const queryClient = new QueryClient();
-  const cookieStore = await cookies();
+  const supabase = createClient();
 
-  // Create the Supabase client for Server Components
-  //   const supabase = createServerClient(
-  //     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  //     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  //     {
-  //       cookies: {
-  //         getAll() { return cookieStore.getAll() },
-  //         setAll(cookiesToSet) {
-  //           try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) }
-  //           catch { /* Handle edge case if modifying cookies in server component */ }
-  //         },
-  //       },
-  //     }
-  //   );
-  const supabase = createClient(cookieStore);
-
-  // Prefetch data on the server using Supabase syntax
-  await queryClient.prefetchQuery({
+  // React Query usará los datos del servidor de inmediato mientras se configura
+  const { data: products } = useQuery({
     queryKey: ["products"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from("products")
         .select("*, categories!inner(name)", { count: "exact" });
       if (error) throw error;
-      return data;
+      return { data, count };
     },
+    initialData: initialProducts,
   });
 
-  await queryClient.prefetchQuery({
+  const { data: categories } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name");
+        .select("name, id")
+        .order("name");
       if (error) throw error;
       return data;
     },
+    initialData: initialCategories,
+  });
+
+  const { data: suppliers } = useQuery({
+    queryKey: ["suppliers"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("suppliers")
+        .select("name, id")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+    initialData: initialSuppliers,
   });
 
   return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      {children}
-    </HydrationBoundary>
+    <>
+      <DataTable
+        data={products?.data ?? []}
+        suppliers={suppliers ?? []}
+        categories={categories ?? []}
+      />
+    </>
   );
 }
+
+export default DataTableWrapper;

@@ -1,24 +1,45 @@
 import { AppSidebar } from "@/components/app-sidebar";
-import { DataTable } from "@/components/data-table";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
-import { Category } from "@/types";
+import { Category, Products, Suppliers } from "@/types";
 import { SectionCards } from "@/components/section-cards";
-import { useQueryClient } from "@tanstack/react-query";
+
 import DataTableWrapper from "@/components/data-table-wrapper";
-// import { getProducts, getCategories, getTotalRevenue } from "@/app/queries";
 
 export default async function Page() {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  // const totalRevenue = getTotalRevenue();
-  // const { data: products, count: totalProducts } = getProducts();
-  // const categories = getCategories();
+  // queryClient.prefetchQuery({
+  //   queryKey: ["products"],
+  //   queryFn: async () => {
+  //     const { data, error, count } = await supabase
+  //       .from("products")
+  //       .select("*, categories!inner(name)", { count: "exact" });
+  //     if (error) throw error;
+  //     return { data, count };
+  //   },
+  // });
+  // queryClient.prefetchQuery({
+  //   queryKey: ["categories"],
+  //   queryFn: getCategories,
+  // });
+  // queryClient.prefetchQuery({
+  //   queryKey: ["suppliers"],
+  //   queryFn: getSuppliers,
+  // });
+  // await Promise.all([
+  // ]);
 
-  // const { data: totalRevenue } = await supabase.rpc("get_total_price");
+  // const cookieStore = await cookies();
+  // const supabase = createClient(cookieStore);
+
+  // const totalRevenue = getTotalRevenue();
+  // const products = getProducts().data;
+  // const categories = getCategories().data;
+  // const suppliers = getSuppliers().data;
 
   const { data: products } = await supabase
     .from("products")
@@ -53,12 +74,19 @@ export default async function Page() {
               {/* <div className="px-4 lg:px-6">
                 <ChartAreaInteractive />
               </div> */}
+              {/* <HydrationBoundary state={dehydrate(queryClient)}>
+              </HydrationBoundary> */}
+              <DataTableWrapper
+                initialProducts={{ data: products as Products[], count: null }}
+                initialCategories={categories as Category[]}
+                initialSuppliers={suppliers as Suppliers[]}
+              />
 
-              <DataTable
-                data={products ?? []}
+              {/* <DataTable
+                data={products?.data ?? []}
                 suppliers={suppliers ?? []}
                 categories={categories ?? []}
-              />
+              /> */}
             </div>
           </div>
         </div>

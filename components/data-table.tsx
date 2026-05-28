@@ -117,6 +117,7 @@ import { createClient } from "@/utils/supabase/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Field,
+  FieldContent,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -130,17 +131,16 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
-import {
-  useMutation,
-  UseMutationResult,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { UseMutationResult, useQueryClient } from "@tanstack/react-query";
 import {
   deleteProduct,
   getProducts,
   updateProduct,
   useUpdateStock,
-} from "@/app/queries";
+} from "@/hooks/queries";
+import Link from "next/link";
+import DataTableSearch from "./search-input";
+import { Switch } from "@/components/ui/switch";
 
 declare module "@tanstack/react-table" {
   interface TableMeta<TData> {
@@ -153,7 +153,7 @@ declare module "@tanstack/react-table" {
       },
       unknown
     >;
-    setData: React.Dispatch<React.SetStateAction<TData[]>>;
+    // setData: React.Dispatch<React.SetStateAction<TData[]>>;
     categories: Category[];
     suppliers: Suppliers[];
     deleteProduct: () => UseMutationResult<null, Error, string, unknown>;
@@ -182,17 +182,22 @@ function DragHandle({ id }: { id: string }) {
 
 const DeleteProduct = ({
   id,
-  deleteProduct,
+  // setData,
 }: {
   id: string;
-  deleteProduct?: (id: string) => void;
+  // setData?: React.Dispatch<React.SetStateAction<Products[]>>;
 }) => {
   const [open, setOpen] = React.useState(false);
+  const deleteProductMutation = deleteProduct();
 
   const handleDelete = async () => {
     try {
-      if (!deleteProduct) return;
-      deleteProduct(id);
+      await deleteProductMutation.mutateAsync(id);
+      // if (setData) {
+      //   setData((prev: Products[]) =>
+      //     prev.filter((product) => product.id !== id),
+      //   );
+      // }
       toast.success("Producto eliminado exitosamente");
       setOpen(false);
     } catch (error) {
@@ -202,66 +207,69 @@ const DeleteProduct = ({
   };
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger
-          render={
-            <Button
-              type="button"
-              variant="ghost"
-              className="flex w-full items-center justify-start"
-            />
-          }
-        >
-          <TrashIcon className="mr-2 h-4 w-4" />
-          Eliminar
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>¿Estás seguro?</DialogTitle>
-            <DialogDescription>
-              Esta acción no se puede deshacer. Esto eliminará permanentemente
-              tu cuenta y tu información de nuestro servidor.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline">Cancelar</Button>} />
-            <Button onClick={handleDelete} variant="destructive">
-              Eliminar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            className="flex w-full items-center justify-start"
+          />
+        }
+      >
+        <TrashIcon className="mr-2 h-4 w-4" />
+        Eliminar
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>¿Estás seguro?</DialogTitle>
+          <DialogDescription>
+            Esta acción no se puede deshacer. Esto eliminará permanentemente tu
+            cuenta y tu información de nuestro servidor.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose render={<Button variant="outline">Cancelar</Button>} />
+          <Button onClick={handleDelete} variant="destructive">
+            Eliminar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 
 const TableEditRow = ({
   product,
   categories,
-  deleteProduct,
-  updateProduct,
+  // deleteProduct,
+  // updateProduct,
+  // setData,
+  suppliers,
 }: {
   product: Products;
   categories: Category[];
-  deleteProduct?: (id: string) => void;
-  updateProduct?: (product: Products) => void;
+  // deleteProduct: (id: string) => void;
+  // updateProduct: (product: Products) => void;
+  // setData?: React.Dispatch<React.SetStateAction<Products[]>>;
+  suppliers: Suppliers[];
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
+  const updateProductData = updateProduct();
   const form = useForm({
     resolver: zodResolver(ProductSchema),
-    defaultValues: { ...product, category_id: String(product.category_id) },
+    defaultValues: {
+      ...product,
+      category_id: String(product.category_id),
+      supplier_id: String(product.supplier_id),
+    },
     mode: "onChange",
   });
-  const supabase = createClient();
 
   const onSubmit = async (data: Products) => {
     try {
-      await ProductSchema.parseAsync(data);
-
-      await supabase.from("products").update(data).eq("id", product.id);
+      await updateProductData.mutateAsync({ ...data, id: product.id });
       toast.success("Producto actualizado exitosamente");
-      form.reset();
       setIsOpen(false);
     } catch (error) {
       console.error(error);
@@ -293,27 +301,73 @@ const TableEditRow = ({
             Editar
           </DropdownMenuItem>
           <DropdownMenuItem>
-            <EyeIcon />
-            Ver detalles
+            <Link
+              href={`/dashboard/${product.id}-${product.name.split(" ").join("-")}`}
+            >
+              <div className="flex items-center gap-2">
+                <EyeIcon /> Ver detalles
+              </div>
+            </Link>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
 
-          <DeleteProduct id={product.id} deleteProduct={deleteProduct} />
+          <DeleteProduct id={product.id} />
         </DropdownMenuContent>
       </DropdownMenu>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>
-              {product?.id ? "Editar" : "Agregar"} Producto
-            </DialogTitle>
-            <DialogDescription>
-              {product?.id ? "Edita" : "Agrega"} un producto al inventario.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={form.handleSubmit(onSubmit)} id="edit-product-form">
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          id={`edit-product-form-${product.id}`}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                {product?.id ? "Editar" : "Agregar"} Producto
+              </DialogTitle>
+              <DialogDescription>
+                {product?.id ? "Edita" : "Agrega"} un producto al inventario.
+              </DialogDescription>
+
+              <FieldGroup>
+                <Controller
+                  control={form.control}
+                  name="status"
+                  render={({ field, fieldState }) => {
+                    const isChecked = field.value === "ACTIVE";
+                    console.log({ field, isChecked });
+                    const toggleChecked = () => {
+                      field.onChange(isChecked ? "INACTIVE" : "ACTIVE");
+                    };
+                    return (
+                      <Field
+                        orientation="horizontal"
+                        data-invalid={fieldState.invalid}
+                      >
+                        <FieldContent className="flex flex-row items-center justify-end">
+                          <FieldLabel>
+                            Estado del producto. Si el producto esta inactivo no
+                            se podra vender pero aparecera en la lista de
+                            productos.
+                          </FieldLabel>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={isChecked}
+                              onCheckedChange={toggleChecked}
+                            />
+                            {isChecked ? "Activo" : "Inactivo"}
+                          </div>
+                        </FieldContent>
+                        {fieldState.invalid && (
+                          <FieldError errors={[fieldState.error]} />
+                        )}
+                      </Field>
+                    );
+                  }}
+                />
+              </FieldGroup>
+            </DialogHeader>
             <FieldGroup>
               <Controller
                 name="name"
@@ -359,6 +413,30 @@ const TableEditRow = ({
               />
 
               <Controller
+                name="barcode"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor={field.name}>
+                      Código de barras
+                    </FieldLabel>
+                    <Input
+                      {...field}
+                      value={String(field.value ?? "")}
+                      id={field.name}
+                      aria-invalid={fieldState.invalid}
+                      placeholder="Código de barras"
+                      autoComplete="off"
+                    />
+
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
+
+              <Controller
                 name="category_id"
                 control={form.control}
                 render={({ field, fieldState }) => (
@@ -384,6 +462,44 @@ const TableEditRow = ({
                             value={String(category.id)}
                           >
                             {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
+
+              <Controller
+                name="supplier_id"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="supplier_id">Proveedor</FieldLabel>
+                    <Select
+                      name="supplier_id"
+                      aria-invalid={fieldState.invalid}
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      items={suppliers.map((s) => ({
+                        label: s.name,
+                        value: String(s.id),
+                      }))}
+                    >
+                      <SelectTrigger id="supplier_id">
+                        <SelectValue placeholder="Selecciona un proveedor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {suppliers.map((supplier) => (
+                          <SelectItem
+                            key={supplier.id}
+                            value={String(supplier.id)}
+                          >
+                            {supplier.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -486,14 +602,14 @@ const TableEditRow = ({
 
               <Button
                 type="submit"
-                form="edit-product-form"
+                form={`edit-product-form-${product.id}`}
                 disabled={form.formState.isSubmitting}
               >
                 Actualizar
               </Button>
             </DialogFooter>
-          </form>
-        </DialogContent>
+          </DialogContent>
+        </form>
       </Dialog>
     </>
   );
@@ -536,7 +652,19 @@ const columns: ColumnDef<Products>[] = [
     accessorKey: "name",
     header: "Nombre del producto",
     cell: ({ row }) => {
-      return <div className="w-32">{row.original.name}</div>;
+      const productId = row.original.id;
+      const productName = row.original.name;
+      const urlSlug = `${productId}-${productName.split(" ").join("-")}`;
+      return (
+        <div className="w-32">
+          <Link
+            href={`/dashboard/${urlSlug}`}
+            className="text-blue-500 hover:text-blue-600"
+          >
+            {row.original.name}
+          </Link>
+        </div>
+      );
     },
     enableHiding: true,
     enableSorting: true,
@@ -563,33 +691,48 @@ const columns: ColumnDef<Products>[] = [
       const stock = row.getValue<number>("stock");
       const min_stock = row.getValue<number>("min_stock");
       const handleUpdateStock = table.options.meta?.updateStock();
-      const setData = table.options.meta?.setData;
+      // const setData = table.options.meta?.setData;
 
       const addStock = async (id: string, stock: number) => {
-        if (setData) {
-          setData((prev: Products[]) => {
-            return prev.map((item) =>
-              item.id === id ? { ...item, stock: stock + 1 } : item,
-            );
-          });
-        }
+        // if (setData) {
+        //   setData((prev: Products[]) => {
+        //     return prev.map((item) =>
+        //       item.id === id ? { ...item, stock: stock + 1 } : item,
+        //     );
+        //   });
+        // }
         handleUpdateStock?.mutateAsync({ id, stock: stock + 1 });
       };
 
       const removeStock = async (id: string, stock: number) => {
         // updateStock().mutate({ id, stock: stock - 1 });
-        if (setData) {
-          setData((prev: Products[]) =>
-            prev.map((item) =>
-              item.id === id ? { ...item, stock: stock - 1 } : item,
-            ),
-          );
-        }
+        // if (setData) {
+        //   setData((prev: Products[]) =>
+        //     prev.map((item) =>
+        //       item.id === id ? { ...item, stock: stock - 1 } : item,
+        //     ),
+        //   );
+        // }
         handleUpdateStock?.mutateAsync({ id, stock: stock - 1 });
       };
 
       return (
         <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  onClick={() => removeStock(row.original.id, stock)}
+                  className="h-4 w-4"
+                >
+                  <MinusIcon />
+                </Button>
+              }
+            />
+            <TooltipContent>Reducir Stock</TooltipContent>
+          </Tooltip>
+          {stock}
           <Tooltip>
             <TooltipTrigger
               render={
@@ -605,22 +748,6 @@ const columns: ColumnDef<Products>[] = [
             <TooltipContent>Aumentar Stock</TooltipContent>
           </Tooltip>
 
-          {stock}
-
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  onClick={() => removeStock(row.original.id, stock)}
-                  className="h-4 w-4"
-                >
-                  <MinusIcon />
-                </Button>
-              }
-            />
-            <TooltipContent>Reducir Stock</TooltipContent>
-          </Tooltip>
           {stock <= min_stock && (
             <Badge
               variant="outline"
@@ -696,35 +823,16 @@ const columns: ColumnDef<Products>[] = [
     accessorKey: "Acciones",
     cell: ({ row, table }) => {
       const categories = (table.options.meta?.categories as Category[]) || [];
-      const deleteProductMutation = table.options.meta?.deleteProduct();
-      const setData = table.options.meta?.setData;
-      const deleteProduct = async (id: string) => {
-        if (setData) {
-          setData((prev: Products[]) => {
-            return prev.filter((item) => item.id !== id);
-          });
-        }
-        deleteProductMutation?.mutateAsync(id);
-      };
-
-      const updateProductMutation = table.options.meta?.updateProduct();
-      const updateProduct = async (product: Products) => {
-        if (setData) {
-          setData((prev: Products[]) => {
-            return prev.map((item) =>
-              item.id === product.id ? product : item,
-            );
-          });
-        }
-        updateProductMutation?.mutateAsync(product);
-      };
+      const suppliers = (table.options.meta?.suppliers as Suppliers[]) || [];
 
       return (
         <TableEditRow
           product={row.original}
           categories={categories}
-          deleteProduct={deleteProduct}
-          updateProduct={updateProduct}
+          // deleteProduct={deleteProduct}
+          // updateProduct={updateProduct}
+          // setData={setData}
+          suppliers={suppliers}
         />
       );
     },
@@ -758,7 +866,7 @@ function DraggableRow({ row }: { row: Row<Products> }) {
 }
 
 export function DataTable({
-  data: initialData,
+  data,
   categories,
   suppliers,
 }: {
@@ -769,7 +877,11 @@ export function DataTable({
   const [openCategoryModal, setOpenCategoryModal] = React.useState(false);
   const [open, setIsOpen] = React.useState(false);
 
-  const [data, setData] = React.useState(initialData);
+  const queryClient = useQueryClient();
+
+  const [searchValue, setSearchValue] = React.useState("");
+
+  const deferredSearchValue = React.useDeferredValue(searchValue);
 
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
@@ -802,9 +914,10 @@ export function DataTable({
       rowSelection,
       columnFilters,
       pagination,
+      globalFilter: deferredSearchValue,
     },
     meta: {
-      setData,
+      // setData,
       categories: categories,
       suppliers: suppliers,
       updateStock: useUpdateStock,
@@ -832,15 +945,31 @@ export function DataTable({
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
+    onGlobalFilterChange: setSearchValue,
+    globalFilterFn: "includesString",
   });
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (active && over && active.id !== over.id) {
-      setData((data) => {
-        const oldIndex = dataIds.indexOf(active.id);
-        const newIndex = dataIds.indexOf(over.id);
-        return arrayMove(data, oldIndex, newIndex);
-      });
+      // setData((data) => {
+      //   const oldIndex = dataIds.indexOf(active.id);
+      //   const newIndex = dataIds.indexOf(over.id);
+      //   return arrayMove(data, oldIndex, newIndex);
+      // });
+
+      queryClient.setQueryData(
+        ["products"],
+        (oldData: { data: Products[] }) => {
+          if (!oldData) return oldData;
+
+          const oldIndex = dataIds.indexOf(active.id);
+          const newIndex = dataIds.indexOf(over.id);
+          return {
+            ...oldData,
+            data: arrayMove(oldData.data, oldIndex, newIndex),
+          };
+        },
+      );
     }
   }
 
@@ -880,6 +1009,8 @@ export function DataTable({
             <TabsTrigger value="categories">Categorías</TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
+            <DataTableSearch value={searchValue} onChange={setSearchValue} />
+
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={<Button variant="outline" size="sm" />}
@@ -1112,6 +1243,7 @@ export function DataTable({
         open={open}
         setIsOpen={setIsOpen}
         categories={categories}
+        suppliers={suppliers}
       />
       <CategoriesModal
         open={openCategoryModal}
@@ -1121,49 +1253,49 @@ export function DataTable({
   );
 }
 
-const chartData = [
-  {
-    month: "January",
-    desktop: 186,
-    mobile: 80,
-  },
-  {
-    month: "February",
-    desktop: 305,
-    mobile: 200,
-  },
-  {
-    month: "March",
-    desktop: 237,
-    mobile: 120,
-  },
-  {
-    month: "April",
-    desktop: 73,
-    mobile: 190,
-  },
-  {
-    month: "May",
-    desktop: 209,
-    mobile: 130,
-  },
-  {
-    month: "June",
-    desktop: 214,
-    mobile: 140,
-  },
-];
+// const chartData = [
+//   {
+//     month: "January",
+//     desktop: 186,
+//     mobile: 80,
+//   },
+//   {
+//     month: "February",
+//     desktop: 305,
+//     mobile: 200,
+//   },
+//   {
+//     month: "March",
+//     desktop: 237,
+//     mobile: 120,
+//   },
+//   {
+//     month: "April",
+//     desktop: 73,
+//     mobile: 190,
+//   },
+//   {
+//     month: "May",
+//     desktop: 209,
+//     mobile: 130,
+//   },
+//   {
+//     month: "June",
+//     desktop: 214,
+//     mobile: 140,
+//   },
+// ];
 
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "var(--primary)",
-  },
-  mobile: {
-    label: "Mobile",
-    color: "var(--primary)",
-  },
-} satisfies ChartConfig;
+// const chartConfig = {
+//   desktop: {
+//     label: "Desktop",
+//     color: "var(--primary)",
+//   },
+//   mobile: {
+//     label: "Mobile",
+//     color: "var(--primary)",
+//   },
+// } satisfies ChartConfig;
 
 // function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
 //   const isMobile = useIsMobile();

@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/field";
 import z from "zod";
 import { toast } from "sonner";
-import { createClient } from "@/utils/supabase/client";
+import { createCategory } from "@/hooks/queries";
 
 type Props = {
   open: boolean;
@@ -36,7 +36,6 @@ const CategoriesModal = ({ open, setIsOpen }: Props) => {
     name: "",
     description: "",
   };
-  const supabase = createClient();
 
   const form = useForm({
     resolver: zodResolver(CategorySchema.omit({ id: true })),
@@ -44,13 +43,13 @@ const CategoriesModal = ({ open, setIsOpen }: Props) => {
     mode: "onChange",
   });
 
+  const createCategoryMutation = createCategory();
+
   const onSubmit = async (data: CategoryOmitId) => {
     try {
       const parsed = await CategorySchema.omit({ id: true }).parseAsync(data);
 
-      const { error } = await supabase.from("categories").insert([parsed]);
-
-      if (error) throw error;
+      await createCategoryMutation.mutateAsync(parsed);
 
       toast.success("Categoría agregada exitosamente");
       form.reset();
