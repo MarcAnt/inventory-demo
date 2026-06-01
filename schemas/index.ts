@@ -3,6 +3,11 @@ import * as z from "zod";
 export const ProductSchema = z.object({
   id: z.string(),
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
+  description: z.string()
+  .min(20, "La descripción debe tener al menos 20 caracteres")
+  .max(256, "La descripción debe tener menos de 256 caracteres")
+  .nullish().default(""),
+ 
   price: z
     .number({
       error: "El precio debe ser un número",
@@ -24,6 +29,17 @@ export const ProductSchema = z.object({
   supplier_id: z.coerce.number({ error: "Por favor, seleccione un proveedor" }).nonnegative().refine(value => value > 0, { message: "Por favor, seleccione un proveedor" }),
   category_id: z.coerce.number({ error: "Por favor, seleccione una categoría" }).nonnegative().refine(value => value > 0, { message: "Por favor, seleccione una categoría" }),
   status: z.enum(["ACTIVE", "INACTIVE"]),
+  // created_by: z.string().min(1, "El creador debe tener al menos 1 caracter").optional(),
+  updated_at: z.coerce.date().optional(),
+  created_at: z.coerce.date().optional(),
+  categories: z.object({
+    name: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
+  }).optional(),
+  suppliers: z.object({
+    name: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
+  }).optional(),
+  
+
 });
 
 

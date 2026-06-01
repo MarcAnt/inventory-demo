@@ -1,4 +1,9 @@
-"use client";
+import { Category, Products, Suppliers } from "@/types";
+import { toast } from "sonner";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { ProductSchema } from "@/schemas";
+import { updateProduct } from "@/hooks/queries";
 import {
   Dialog,
   DialogClose,
@@ -8,7 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import {
   Field,
   FieldContent,
@@ -16,6 +22,8 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
+import { Controller } from "react-hook-form";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -23,85 +31,76 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
-import { ProductSchema } from "@/schemas";
-import type { Category, Products, Suppliers } from "@/types";
-import { createProduct } from "@/hooks/queries";
-import { Switch } from "@/components/ui/switch";
-import { useId } from "react";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
 import { InfoIcon } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
 
-type ProductOmitId = Omit<Products, "id">;
-
-type Props = {
-  open: boolean;
-  setIsOpen: (open: boolean) => void;
-  categories: Category[];
-  suppliers: Suppliers[];
-};
-
-export const ProductsModal = ({
+const EditProductModal = ({
+  product,
   categories,
   suppliers,
-  open,
+  isOpen,
   setIsOpen,
-}: Props) => {
-  const defaultValue: ProductOmitId = {
-    name: "",
-    price: 0,
-    sku: "",
-    stock: 0,
-    min_stock: 0,
-    category_id: 0,
-    supplier_id: 0,
-    barcode: 0,
-    status: "ACTIVE",
-    description: "",
-  };
-
-  const formId = useId();
+}: {
+  product: Products;
+  categories: Category[];
+  suppliers: Suppliers[];
+  isOpen: boolean;
+  setIsOpen: (open: boolean) => void;
+}) => {
+  const updateProductData = updateProduct();
 
   const form = useForm({
-    resolver: zodResolver(ProductSchema.omit({ id: true })),
-    defaultValues: defaultValue,
+    resolver: zodResolver(
+      ProductSchema.omit({
+        updated_at: true,
+        created_at: true,
+        categories: true,
+        suppliers: true,
+      }),
+    ),
+    defaultValues: {
+      ...product,
+      category_id: String(product.category_id),
+      supplier_id: String(product.supplier_id),
+    },
     mode: "onChange",
   });
 
-  const addProductMutation = createProduct();
-
-  const onSubmit = async (data: ProductOmitId) => {
+  const onSubmit = async (
+    data: Omit<
+      Products,
+      "updated_at" | "created_at" | "categories" | "suppliers"
+    >,
+  ) => {
     try {
-      await addProductMutation.mutateAsync(data);
-
-      toast.success("Producto agregado exitosamente");
-      form.reset();
+      //   console.log(data);
+      await updateProductData.mutateAsync({ ...data, id: product.id });
+      toast.success("Producto actualizado exitosamente");
       setIsOpen(false);
     } catch (error) {
       console.error(error);
-      toast.error("Error al agregar el producto");
+      toast.error("Error al actualizar el producto");
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        id={`${formId}-add-product-form`}
+        id={`edit-product-form-${product.id}`}
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Agregar Producto</DialogTitle>
+            <DialogTitle>
+              {product?.id ? "Editar" : "Agregar"} Producto
+            </DialogTitle>
             <DialogDescription>
-              Agrega un producto al inventario.
+              {product?.id ? "Edita" : "Agrega"} un producto al inventario.
             </DialogDescription>
 
             <FieldGroup>
@@ -137,12 +136,11 @@ export const ProductsModal = ({
                             </PopoverContent>
                           </Popover>
                         </FieldLabel>
+
                         <div className="flex items-center gap-2">
                           <Switch
                             checked={isChecked}
                             onCheckedChange={toggleChecked}
-                            aria-invalid={fieldState.invalid}
-                            disabled={addProductMutation.isPending}
                           />
                           {isChecked ? "Activo" : "Inactivo"}
                         </div>
@@ -156,7 +154,6 @@ export const ProductsModal = ({
               />
             </FieldGroup>
           </DialogHeader>
-
           <FieldGroup>
             <Controller
               name="name"
@@ -243,94 +240,84 @@ export const ProductsModal = ({
                 </Field>
               )}
             />
+          </FieldGroup>
 
-            <div className="grid grid-cols-2 gap-2">
-              <Controller
-                name="category_id"
-                control={form.control}
-                render={({ field, fieldState }) => {
-                  return (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="category_id">Categoría</FieldLabel>
-                      <Select
-                        name={"category_id"}
-                        onValueChange={field.onChange}
-                        aria-invalid={fieldState.invalid}
-                        value={field.value ? String(field.value) : ""}
-                        items={categories.map((c) => ({
-                          label: c.name,
-                          value: String(c.id),
-                        }))}
-                      >
-                        <SelectTrigger id="category_id">
-                          <SelectValue placeholder="Selecciona una categoría" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem>Sin categoría</SelectItem>
-                          {categories.map((category) => {
-                            return (
-                              <SelectItem
-                                key={category.id}
-                                value={String(category.id)}
-                              >
-                                {category.name}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
+          <FieldGroup className="grid grid-cols-2 gap-2">
+            <Controller
+              name="category_id"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="category_id">Categoría</FieldLabel>
+                  <Select
+                    name="category_id"
+                    aria-invalid={fieldState.invalid}
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    items={categories.map((c) => ({
+                      label: c.name,
+                      value: String(c.id),
+                    }))}
+                  >
+                    <SelectTrigger id="category_id">
+                      <SelectValue placeholder="Selecciona una categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem
+                          key={category.id}
+                          value={String(category.id)}
+                        >
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-                      {fieldState.invalid && (
-                        <FieldError errors={[fieldState.error]} />
-                      )}
-                    </Field>
-                  );
-                }}
-              />
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
+              )}
+            />
 
-              <Controller
-                name="supplier_id"
-                control={form.control}
-                render={({ field, fieldState }) => {
-                  return (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="category_id">Proveedor</FieldLabel>
-                      <Select
-                        name={"supplier_id"}
-                        onValueChange={field.onChange}
-                        aria-invalid={fieldState.invalid}
-                        value={field.value ? String(field.value) : ""}
-                        items={suppliers.map((s) => ({
-                          label: s.name,
-                          value: String(s.id),
-                        }))}
-                      >
-                        <SelectTrigger id="supplier_id">
-                          <SelectValue placeholder="Selecciona un proveedor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem>Sin proveedor</SelectItem>
-                          {suppliers.map((supplier) => {
-                            return (
-                              <SelectItem
-                                key={supplier.id}
-                                value={String(supplier.id)}
-                              >
-                                {supplier.name}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
+            <Controller
+              name="supplier_id"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="supplier_id">Proveedor</FieldLabel>
+                  <Select
+                    name="supplier_id"
+                    aria-invalid={fieldState.invalid}
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    items={suppliers.map((s) => ({
+                      label: s.name,
+                      value: String(s.id),
+                    }))}
+                  >
+                    <SelectTrigger id="supplier_id">
+                      <SelectValue placeholder="Selecciona un proveedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {suppliers.map((supplier) => (
+                        <SelectItem
+                          key={supplier.id}
+                          value={String(supplier.id)}
+                        >
+                          {supplier.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-                      {fieldState.invalid && (
-                        <FieldError errors={[fieldState.error]} />
-                      )}
-                    </Field>
-                  );
-                }}
-              />
-            </div>
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
+              )}
+            />
           </FieldGroup>
 
           <FieldGroup className="grid grid-cols-3 gap-2">
@@ -355,6 +342,7 @@ export const ProductsModal = ({
                       field.onChange(e.target.valueAsNumber);
                     }}
                   />
+
                   {fieldState.invalid && (
                     <FieldError errors={[fieldState.error]} />
                   )}
@@ -372,7 +360,6 @@ export const ProductsModal = ({
                     type="number"
                     value={field.value ?? 0}
                     id={field.name}
-                    min={0}
                     aria-invalid={fieldState.invalid}
                     placeholder="Stock Actual"
                     autoComplete="off"
@@ -380,6 +367,7 @@ export const ProductsModal = ({
                       field.onChange(e.target.valueAsNumber);
                     }}
                   />
+
                   {fieldState.invalid && (
                     <FieldError errors={[fieldState.error]} />
                   )}
@@ -398,7 +386,6 @@ export const ProductsModal = ({
                     type="number"
                     value={field.value ?? 0}
                     id={field.name}
-                    min={0}
                     aria-invalid={fieldState.invalid}
                     placeholder="Stock Mínimo"
                     autoComplete="off"
@@ -406,6 +393,7 @@ export const ProductsModal = ({
                       field.onChange(e.target.valueAsNumber);
                     }}
                   />
+
                   {fieldState.invalid && (
                     <FieldError errors={[fieldState.error]} />
                   )}
@@ -415,15 +403,14 @@ export const ProductsModal = ({
           </FieldGroup>
 
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>
-              Cancelar
-            </DialogClose>
+            <DialogClose render={<Button variant="outline">Cancelar</Button>} />
+
             <Button
               type="submit"
-              form={`${formId}-add-product-form`}
+              form={`edit-product-form-${product.id}`}
               disabled={form.formState.isSubmitting}
             >
-              Crear
+              Actualizar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -431,3 +418,5 @@ export const ProductsModal = ({
     </Dialog>
   );
 };
+
+export default EditProductModal;

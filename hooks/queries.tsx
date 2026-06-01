@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { createClient } from "@/utils/supabase/client";
-import { Category, Products, Suppliers } from "@/types";
+import { Category, Currency, Products, Suppliers } from "@/types";
 
 const supabase = createClient();
 
@@ -22,11 +22,28 @@ export function useUpdateStock() {
   });
 }
 
+export const updateProductStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { data, error } = await supabase
+        .from("products")
+        .update({ status })
+        .eq("id", id)
+        .select();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
+  });
+};
+
 export const updateProduct = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (product: Products) => {
-      console.log("product", product);
       const { data, error } = await supabase
         .from("products")
         .update(product)
@@ -46,7 +63,7 @@ export const getTotalRevenue = () => {
   return useQuery<number>({
     queryKey: ["total-revenue"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_total_price");
+      const { data, error } = await supabase.rpc("get_total_revenues");
       if (error) throw error;
       return data;
     },
@@ -63,6 +80,23 @@ export const getProducts = () => {
       if (error) throw error;
       return { data, count };
     },
+  });
+};
+
+export const getProductBySlug = (slug: string) => {
+  return useQuery<Products>({
+    queryKey: ["products", slug],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*, categories!inner(name), suppliers!inner(name)")
+        .eq("name", slug.replaceAll("-", " "))
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    // refetchInterval: 10000,
   });
 };
 
@@ -132,6 +166,23 @@ export const createCategory = () => {
   });
 };
 
+export const getCategoryByProductId = () => {
+  return (productId: number) => {
+    return useQuery<Category>({
+      queryKey: ["categories", productId],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from("products")
+          .select("*, categories!inner(name)")
+          .eq("id", productId)
+          .single();
+        if (error) throw error;
+        return data as Category;
+      },
+    });
+  };
+};
+
 export const getSuppliers = () => {
   return useQuery<Suppliers[]>({
     queryKey: ["suppliers"],
@@ -143,5 +194,35 @@ export const getSuppliers = () => {
       if (error) throw error;
       return data;
     },
+  });
+};
+
+export const getTotalStock = () => {
+  return useQuery<number>({
+    queryKey: ["total-stock"],
+    queryFn: async () => {
+      // const { data, error } = await supabase
+      //   .from("products")
+      //   .select("stock")
+      //   .eq("status", "ACTIVE");
+      // if (error) throw error;
+      // return data?.reduce((acc, product) => acc + product.stock, 0) || 0;
+
+      const { data, error } = await supabase.rpc("get_total_stock");
+      if (error) throw error;
+      return data as number;
+    },
+  });
+};
+
+export const getCurrentCurrency = () => {
+  return useQuery<Currency[]>({
+    queryKey: ["current-currency"],
+    queryFn: async () => {
+      const response = await fetch("https://ve.dolarapi.com/v1/dolares");
+      const data: Currency[] = await response.json();
+      return data;
+    },
+    refetchInterval: 24 * 60 * 60,
   });
 };

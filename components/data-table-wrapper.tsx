@@ -1,7 +1,6 @@
 "use client";
 
 import { DataTable } from "./data-table";
-import { getProducts, getCategories, getSuppliers } from "@/hooks/queries";
 import { Category, Products, Suppliers } from "@/types";
 import { createClient } from "@/utils/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -57,13 +56,11 @@ function DataTableWrapper({
   });
 
   return (
-    <>
-      <DataTable
-        data={products?.data ?? []}
-        suppliers={suppliers ?? []}
-        categories={categories ?? []}
-      />
-    </>
+    <DataTable
+      data={products?.data ?? []}
+      suppliers={suppliers ?? []}
+      categories={categories ?? []}
+    />
   );
 }
 

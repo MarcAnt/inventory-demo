@@ -35,27 +35,9 @@ import {
   type SortingState,
   type VisibilityState,
 } from "@tanstack/react-table";
-import { z } from "zod";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart";
 import { Checkbox } from "@/components/ui/checkbox";
-// import {
-//   Drawer,
-//   DrawerClose,
-//   DrawerContent,
-//   DrawerDescription,
-//   DrawerFooter,
-//   DrawerHeader,
-//   DrawerTitle,
-//   DrawerTrigger,
-// } from "@/components/ui/drawer";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -74,7 +56,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -97,33 +78,9 @@ import {
   PlusIcon,
   EyeIcon,
   SquarePenIcon,
-  TrashIcon,
   MinusIcon,
 } from "lucide-react";
 import { ProductsModal } from "./products-modal";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
-import { createClient } from "@/utils/supabase/client";
-import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  Field,
-  FieldContent,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { ProductSchema } from "@/schemas";
 import CategoriesModal from "./categories-modal";
 import { Category, Products, Suppliers } from "@/types";
 import {
@@ -132,15 +89,12 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 import { UseMutationResult, useQueryClient } from "@tanstack/react-query";
-import {
-  deleteProduct,
-  getProducts,
-  updateProduct,
-  useUpdateStock,
-} from "@/hooks/queries";
+import { deleteProduct, updateProduct, useUpdateStock } from "@/hooks/queries";
 import Link from "next/link";
 import DataTableSearch from "./search-input";
-import { Switch } from "@/components/ui/switch";
+import DeleteProductModal from "./delete-modal";
+import EditProductModal from "./edit-modal";
+import { useHandleCurrency } from "@/hooks/use-handle-currency";
 
 declare module "@tanstack/react-table" {
   interface TableMeta<TData> {
@@ -158,6 +112,8 @@ declare module "@tanstack/react-table" {
     suppliers: Suppliers[];
     deleteProduct: () => UseMutationResult<null, Error, string, unknown>;
     updateProduct: () => UseMutationResult<any[], Error, Products, unknown>;
+    handleCurrency: (price: number) => number | string;
+    toggleCurrency: string;
   }
 }
 
@@ -180,102 +136,16 @@ function DragHandle({ id }: { id: string }) {
   );
 }
 
-const DeleteProduct = ({
-  id,
-  // setData,
-}: {
-  id: string;
-  // setData?: React.Dispatch<React.SetStateAction<Products[]>>;
-}) => {
-  const [open, setOpen] = React.useState(false);
-  const deleteProductMutation = deleteProduct();
-
-  const handleDelete = async () => {
-    try {
-      await deleteProductMutation.mutateAsync(id);
-      // if (setData) {
-      //   setData((prev: Products[]) =>
-      //     prev.filter((product) => product.id !== id),
-      //   );
-      // }
-      toast.success("Producto eliminado exitosamente");
-      setOpen(false);
-    } catch (error) {
-      console.error(error);
-      toast.error("Error al eliminar el producto");
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button
-            type="button"
-            variant="ghost"
-            className="flex w-full items-center justify-start"
-          />
-        }
-      >
-        <TrashIcon className="mr-2 h-4 w-4" />
-        Eliminar
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>¿Estás seguro?</DialogTitle>
-          <DialogDescription>
-            Esta acción no se puede deshacer. Esto eliminará permanentemente tu
-            cuenta y tu información de nuestro servidor.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose render={<Button variant="outline">Cancelar</Button>} />
-          <Button onClick={handleDelete} variant="destructive">
-            Eliminar
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
 const TableEditRow = ({
   product,
   categories,
-  // deleteProduct,
-  // updateProduct,
-  // setData,
   suppliers,
 }: {
   product: Products;
   categories: Category[];
-  // deleteProduct: (id: string) => void;
-  // updateProduct: (product: Products) => void;
-  // setData?: React.Dispatch<React.SetStateAction<Products[]>>;
   suppliers: Suppliers[];
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
-  const updateProductData = updateProduct();
-  const form = useForm({
-    resolver: zodResolver(ProductSchema),
-    defaultValues: {
-      ...product,
-      category_id: String(product.category_id),
-      supplier_id: String(product.supplier_id),
-    },
-    mode: "onChange",
-  });
-
-  const onSubmit = async (data: Products) => {
-    try {
-      await updateProductData.mutateAsync({ ...data, id: product.id });
-      toast.success("Producto actualizado exitosamente");
-      setIsOpen(false);
-    } catch (error) {
-      console.error(error);
-      toast.error("Error al actualizar el producto");
-    }
-  };
 
   return (
     <>
@@ -301,9 +171,7 @@ const TableEditRow = ({
             Editar
           </DropdownMenuItem>
           <DropdownMenuItem>
-            <Link
-              href={`/dashboard/${product.id}-${product.name.split(" ").join("-")}`}
-            >
+            <Link href={`/dashboard/${product.name.split(" ").join("-")}`}>
               <div className="flex items-center gap-2">
                 <EyeIcon /> Ver detalles
               </div>
@@ -312,305 +180,17 @@ const TableEditRow = ({
 
           <DropdownMenuSeparator />
 
-          <DeleteProduct id={product.id} />
+          <DeleteProductModal id={product.id} />
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          id={`edit-product-form-${product.id}`}
-        >
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                {product?.id ? "Editar" : "Agregar"} Producto
-              </DialogTitle>
-              <DialogDescription>
-                {product?.id ? "Edita" : "Agrega"} un producto al inventario.
-              </DialogDescription>
-
-              <FieldGroup>
-                <Controller
-                  control={form.control}
-                  name="status"
-                  render={({ field, fieldState }) => {
-                    const isChecked = field.value === "ACTIVE";
-                    console.log({ field, isChecked });
-                    const toggleChecked = () => {
-                      field.onChange(isChecked ? "INACTIVE" : "ACTIVE");
-                    };
-                    return (
-                      <Field
-                        orientation="horizontal"
-                        data-invalid={fieldState.invalid}
-                      >
-                        <FieldContent className="flex flex-row items-center justify-end">
-                          <FieldLabel>
-                            Estado del producto. Si el producto esta inactivo no
-                            se podra vender pero aparecera en la lista de
-                            productos.
-                          </FieldLabel>
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              checked={isChecked}
-                              onCheckedChange={toggleChecked}
-                            />
-                            {isChecked ? "Activo" : "Inactivo"}
-                          </div>
-                        </FieldContent>
-                        {fieldState.invalid && (
-                          <FieldError errors={[fieldState.error]} />
-                        )}
-                      </Field>
-                    );
-                  }}
-                />
-              </FieldGroup>
-            </DialogHeader>
-            <FieldGroup>
-              <Controller
-                name="name"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={field.name}>Nombre</FieldLabel>
-                    <Input
-                      {...field}
-                      value={field.value ?? ""}
-                      id={field.name}
-                      aria-invalid={fieldState.invalid}
-                      placeholder="Nombre del producto"
-                      autoComplete="off"
-                    />
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-
-              <Controller
-                name="sku"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={field.name}>SKU</FieldLabel>
-                    <Input
-                      {...field}
-                      value={field.value ?? ""}
-                      id={field.name}
-                      aria-invalid={fieldState.invalid}
-                      placeholder="SKU"
-                      autoComplete="off"
-                    />
-
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-
-              <Controller
-                name="barcode"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={field.name}>
-                      Código de barras
-                    </FieldLabel>
-                    <Input
-                      {...field}
-                      value={String(field.value ?? "")}
-                      id={field.name}
-                      aria-invalid={fieldState.invalid}
-                      placeholder="Código de barras"
-                      autoComplete="off"
-                    />
-
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-
-              <Controller
-                name="category_id"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="category_id">Categoría</FieldLabel>
-                    <Select
-                      name="category_id"
-                      aria-invalid={fieldState.invalid}
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      items={categories.map((c) => ({
-                        label: c.name,
-                        value: String(c.id),
-                      }))}
-                    >
-                      <SelectTrigger id="category_id">
-                        <SelectValue placeholder="Selecciona una categoría" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem
-                            key={category.id}
-                            value={String(category.id)}
-                          >
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-
-              <Controller
-                name="supplier_id"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="supplier_id">Proveedor</FieldLabel>
-                    <Select
-                      name="supplier_id"
-                      aria-invalid={fieldState.invalid}
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      items={suppliers.map((s) => ({
-                        label: s.name,
-                        value: String(s.id),
-                      }))}
-                    >
-                      <SelectTrigger id="supplier_id">
-                        <SelectValue placeholder="Selecciona un proveedor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {suppliers.map((supplier) => (
-                          <SelectItem
-                            key={supplier.id}
-                            value={String(supplier.id)}
-                          >
-                            {supplier.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-            </FieldGroup>
-
-            <FieldGroup className="grid grid-cols-3 gap-2">
-              <Controller
-                name="price"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={field.name}>Precio</FieldLabel>
-                    <Input
-                      {...field}
-                      step="0.01"
-                      inputMode="decimal"
-                      type="number"
-                      value={field.value ?? 0}
-                      id={field.name}
-                      aria-invalid={fieldState.invalid}
-                      placeholder="Precio"
-                      autoComplete="off"
-                      min={0}
-                      onChange={(e) => {
-                        field.onChange(e.target.valueAsNumber);
-                      }}
-                    />
-
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-              <Controller
-                name="stock"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={field.name}>Stock</FieldLabel>
-                    <Input
-                      {...field}
-                      type="number"
-                      value={field.value ?? 0}
-                      id={field.name}
-                      aria-invalid={fieldState.invalid}
-                      placeholder="Stock Actual"
-                      autoComplete="off"
-                      onChange={(e) => {
-                        field.onChange(e.target.valueAsNumber);
-                      }}
-                    />
-
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-
-              <Controller
-                name="min_stock"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={field.name}>Stock Mínimo</FieldLabel>
-                    <Input
-                      {...field}
-                      type="number"
-                      value={field.value ?? 0}
-                      id={field.name}
-                      aria-invalid={fieldState.invalid}
-                      placeholder="Stock Mínimo"
-                      autoComplete="off"
-                      onChange={(e) => {
-                        field.onChange(e.target.valueAsNumber);
-                      }}
-                    />
-
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-            </FieldGroup>
-
-            <DialogFooter>
-              <DialogClose
-                render={<Button variant="outline">Cancelar</Button>}
-              />
-
-              <Button
-                type="submit"
-                form={`edit-product-form-${product.id}`}
-                disabled={form.formState.isSubmitting}
-              >
-                Actualizar
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </form>
-      </Dialog>
+      <EditProductModal
+        product={product}
+        categories={categories}
+        suppliers={suppliers}
+        isOpen={isOpen}
+        setIsOpen={setIsOpen}
+      />
     </>
   );
 };
@@ -652,9 +232,8 @@ const columns: ColumnDef<Products>[] = [
     accessorKey: "name",
     header: "Nombre del producto",
     cell: ({ row }) => {
-      const productId = row.original.id;
       const productName = row.original.name;
-      const urlSlug = `${productId}-${productName.split(" ").join("-")}`;
+      const urlSlug = `${productName.split(" ").join("-")}`;
       return (
         <div className="w-32">
           <Link
@@ -673,7 +252,13 @@ const columns: ColumnDef<Products>[] = [
   {
     accessorKey: "price",
     header: "Precio Unitario",
-    cell: ({ row }) => <div className="w-32">${row.original.price}</div>,
+    cell: ({ row, table }) => {
+      const handleCurrency = table.options.meta?.handleCurrency;
+      const toggleCurrency = table.options.meta?.toggleCurrency;
+      return (
+        <div className="w-32">{`${toggleCurrency} ${handleCurrency?.(row.original.price)}`}</div>
+      );
+    },
     enableSorting: true,
     sortingFn: "alphanumeric",
   },
@@ -691,28 +276,12 @@ const columns: ColumnDef<Products>[] = [
       const stock = row.getValue<number>("stock");
       const min_stock = row.getValue<number>("min_stock");
       const handleUpdateStock = table.options.meta?.updateStock();
-      // const setData = table.options.meta?.setData;
 
       const addStock = async (id: string, stock: number) => {
-        // if (setData) {
-        //   setData((prev: Products[]) => {
-        //     return prev.map((item) =>
-        //       item.id === id ? { ...item, stock: stock + 1 } : item,
-        //     );
-        //   });
-        // }
         handleUpdateStock?.mutateAsync({ id, stock: stock + 1 });
       };
 
       const removeStock = async (id: string, stock: number) => {
-        // updateStock().mutate({ id, stock: stock - 1 });
-        // if (setData) {
-        //   setData((prev: Products[]) =>
-        //     prev.map((item) =>
-        //       item.id === id ? { ...item, stock: stock - 1 } : item,
-        //     ),
-        //   );
-        // }
         handleUpdateStock?.mutateAsync({ id, stock: stock - 1 });
       };
 
@@ -766,7 +335,9 @@ const columns: ColumnDef<Products>[] = [
     accessorKey: "min_stock",
     header: "Stock Mínimo",
     cell: ({ row }) => {
-      return <div className="w-32">{row.original.min_stock ?? 0}</div>;
+      return (
+        <div className="w-32 text-center">{row.original.min_stock ?? 0}</div>
+      );
     },
     enableSorting: true,
     sortingFn: "alphanumeric",
@@ -778,7 +349,7 @@ const columns: ColumnDef<Products>[] = [
       const suppliers = table.options.meta?.suppliers;
 
       return (
-        <div className="w-32">
+        <div className="w-32 flex items-center justify-start">
           <Badge variant="outline" className="px-1.5 text-muted-foreground">
             {
               suppliers?.find(
@@ -802,7 +373,7 @@ const columns: ColumnDef<Products>[] = [
       const categories = table.options.meta as { categories: Category[] };
 
       return (
-        <div className="w-32">
+        <div className="w-32 flex items-center justify-start">
           <Badge variant="outline" className="px-1.5 text-muted-foreground">
             {
               categories?.categories?.find(
@@ -829,9 +400,6 @@ const columns: ColumnDef<Products>[] = [
         <TableEditRow
           product={row.original}
           categories={categories}
-          // deleteProduct={deleteProduct}
-          // updateProduct={updateProduct}
-          // setData={setData}
           suppliers={suppliers}
         />
       );
@@ -878,10 +446,11 @@ export function DataTable({
   const [open, setIsOpen] = React.useState(false);
 
   const queryClient = useQueryClient();
-
   const [searchValue, setSearchValue] = React.useState("");
-
   const deferredSearchValue = React.useDeferredValue(searchValue);
+
+  const { handleToggleCalculate, toggleCurrency, handleCurrency } =
+    useHandleCurrency();
 
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
@@ -923,12 +492,14 @@ export function DataTable({
       updateStock: useUpdateStock,
       deleteProduct: deleteProduct,
       updateProduct: updateProduct,
+      handleCurrency: handleCurrency,
+      toggleCurrency: toggleCurrency,
     },
     initialState: {
       sorting: [
         {
           id: "name",
-          desc: true,
+          desc: false,
         },
       ],
     },
@@ -1007,8 +578,13 @@ export function DataTable({
           <TabsList className="hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:bg-muted-foreground/30 **:data-[slot=badge]:px-1 @4xl/main:flex">
             <TabsTrigger value="products">Productos</TabsTrigger>
             <TabsTrigger value="categories">Categorías</TabsTrigger>
+            <TabsTrigger value="suppliers">Proveedores</TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
+            <Button className="text-xs" onClick={() => handleToggleCalculate()}>
+              <p>Convertir a {`${toggleCurrency === "$" ? "Bs." : "$"}`}</p>
+            </Button>
+
             <DataTableSearch value={searchValue} onChange={setSearchValue} />
 
             <DropdownMenu>
@@ -1145,12 +721,12 @@ export function DataTable({
           <div className="flex items-center justify-between px-4">
             <div className="hidden flex-1 text-sm text-muted-foreground lg:flex">
               {table.getFilteredSelectedRowModel().rows.length} of{" "}
-              {table.getFilteredRowModel().rows.length} row(s) selected.
+              {table.getFilteredRowModel().rows.length} fila(s) seleccionadas.
             </div>
             <div className="flex w-full items-center gap-8 lg:w-fit">
               <div className="hidden items-center gap-2 lg:flex">
                 <Label htmlFor="rows-per-page" className="text-sm font-medium">
-                  Rows per page
+                  Filas por página
                 </Label>
                 <Select
                   value={`${table.getState().pagination.pageSize}`}
@@ -1179,7 +755,7 @@ export function DataTable({
                 </Select>
               </div>
               <div className="flex w-fit items-center justify-center text-sm font-medium">
-                Page {table.getState().pagination.pageIndex + 1} of{" "}
+                Página {table.getState().pagination.pageIndex + 1} de{" "}
                 {table.getPageCount()}
               </div>
               <div className="ml-auto flex items-center gap-2 lg:ml-0">
@@ -1189,7 +765,7 @@ export function DataTable({
                   onClick={() => table.setPageIndex(0)}
                   disabled={!table.getCanPreviousPage()}
                 >
-                  <span className="sr-only">Go to first page</span>
+                  <span className="sr-only">Ir a la primera página</span>
                   <ChevronsLeftIcon />
                 </Button>
                 <Button
@@ -1199,7 +775,7 @@ export function DataTable({
                   onClick={() => table.previousPage()}
                   disabled={!table.getCanPreviousPage()}
                 >
-                  <span className="sr-only">Go to previous page</span>
+                  <span className="sr-only">Ir a la página anterior</span>
                   <ChevronLeftIcon />
                 </Button>
                 <Button
@@ -1209,7 +785,7 @@ export function DataTable({
                   onClick={() => table.nextPage()}
                   disabled={!table.getCanNextPage()}
                 >
-                  <span className="sr-only">Go to next page</span>
+                  <span className="sr-only">Ir a la página siguiente</span>
                   <ChevronRightIcon />
                 </Button>
                 <Button
@@ -1219,7 +795,7 @@ export function DataTable({
                   onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                   disabled={!table.getCanNextPage()}
                 >
-                  <span className="sr-only">Go to last page</span>
+                  <span className="sr-only">Ir a la última página</span>
                   <ChevronsRightIcon />
                 </Button>
               </div>
@@ -1229,15 +805,10 @@ export function DataTable({
         <TabsContent value="categories" className="flex flex-col px-4 lg:px-6">
           <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
         </TabsContent>
-        {/* <TabsContent value="key-personnel" className="flex flex-col px-4 lg:px-6">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent> */}
-        {/* <TabsContent
-        value="focus-documents"
-        className="flex flex-col px-4 lg:px-6"
-      >
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent> */}
+
+        <TabsContent value="suppliers" className="flex flex-col px-4 lg:px-6">
+          <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
+        </TabsContent>
       </Tabs>
       <ProductsModal
         open={open}
