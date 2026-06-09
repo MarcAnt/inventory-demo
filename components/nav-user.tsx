@@ -16,13 +16,15 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useSignOutAuthUser } from "@/hooks/queries";
 import {
   EllipsisVerticalIcon,
   CircleUserRoundIcon,
-  CreditCardIcon,
   BellIcon,
   LogOutIcon,
 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export function NavUser({
   user,
@@ -34,6 +36,18 @@ export function NavUser({
   };
 }) {
   const { isMobile } = useSidebar();
+  const { mutateAsync: signOut } = useSignOutAuthUser();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      router.push("/login");
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -49,9 +63,6 @@ export function NavUser({
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-medium">{user.name}</span>
-              <span className="truncate text-xs text-foreground/70">
-                {user.email}
-              </span>
             </div>
             <EllipsisVerticalIcon className="ml-auto size-4" />
           </DropdownMenuTrigger>
@@ -70,16 +81,22 @@ export function NavUser({
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">{user.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {user.email}
-                    </span>
                   </div>
                 </div>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem
+                render={
+                  <div className="flex items-center gap-2 w-full">
+                    <CircleUserRoundIcon />
+                    <Link className="w-full" href="/profile">
+                      Cuenta
+                    </Link>
+                  </div>
+                }
+              >
                 <CircleUserRoundIcon />
                 Cuenta
               </DropdownMenuItem>
@@ -89,7 +106,7 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSignOut}>
               <LogOutIcon />
               Cerrar sesión
             </DropdownMenuItem>

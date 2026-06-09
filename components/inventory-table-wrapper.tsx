@@ -1,11 +1,10 @@
 "use client";
-
-import { DataTable } from "./data-table";
 import { Category, Product, Supplier } from "@/types";
 import { createClient } from "@/utils/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import InventoryDataTable from "./inventory-data-table";
 
-function DataTableWrapper({
+function InventoryTableWrapper({
   initialProducts,
   initialCategories,
   initialSuppliers,
@@ -17,17 +16,16 @@ function DataTableWrapper({
   const supabase = createClient();
 
   const { data: products } = useQuery({
-    queryKey: ["products", { status: "INACTIVE" }],
+    queryKey: ["products"],
     queryFn: async () => {
       const { data, error, count } = await supabase
         .from("products")
-        .select("*")
-        .eq("status", "INACTIVE")
-        .lte("stock", 1);
+        .select("*, categories!inner(name)", { count: "exact" });
       if (error) throw error;
       return { data, count };
     },
     initialData: initialProducts,
+    refetchOnWindowFocus: false,
   });
 
   const { data: categories } = useQuery({
@@ -35,8 +33,8 @@ function DataTableWrapper({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("name, id, description")
-        .order("name");
+        .select("name, id");
+      // .order("name");
       if (error) throw error;
       return data;
     },
@@ -48,20 +46,21 @@ function DataTableWrapper({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("suppliers")
-        .select("name, description, id")
-        .order("name");
+        .select("name, id");
+      // .order("name");
       if (error) throw error;
       return data;
     },
     initialData: initialSuppliers,
   });
+
   return (
-    <DataTable
-      data={products?.data ?? []}
-      suppliers={suppliers ?? []}
-      categories={categories ?? []}
+    <InventoryDataTable
+      data={products.data || []}
+      categories={categories}
+      suppliers={suppliers}
     />
   );
 }
 
-export default DataTableWrapper;
+export default InventoryTableWrapper;

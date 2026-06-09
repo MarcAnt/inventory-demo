@@ -3,10 +3,11 @@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
-  getCategories,
-  getProductBySlug,
-  getSuppliers,
-  updateProductStatus,
+  useGetCategories,
+  useGetSuppliers,
+  useGetProductBySlug,
+  useUpdateProductStatus,
+  useGetUserProfile,
 } from "@/hooks/queries";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
@@ -43,6 +44,7 @@ import {
 import EditProductModal from "@/components/edit-modal";
 import { useHandleCurrency } from "@/hooks/use-handle-currency";
 import { Skeleton } from "@/components/ui/skeleton";
+import Link from "next/link";
 
 const statusSchema = z.object({
   status: z.enum(["ACTIVE", "INACTIVE"]),
@@ -54,7 +56,11 @@ const DetailsProduct = () => {
   const [open, setOpen] = useState(false);
 
   const params = useParams<{ slug: string }>();
-  const { data: product, isLoading } = getProductBySlug(params.slug);
+  const { data: product, isLoading } = useGetProductBySlug(params.slug);
+
+  // console.log({ product });
+
+  const { data: user } = useGetUserProfile();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(statusSchema),
@@ -62,9 +68,9 @@ const DetailsProduct = () => {
       status: product?.status ?? "ACTIVE",
     },
   });
-  const updateProductStatusMutation = updateProductStatus();
-  const { data: categories } = getCategories();
-  const { data: suppliers } = getSuppliers();
+  const updateProductStatusMutation = useUpdateProductStatus();
+  const { data: categories } = useGetCategories();
+  const { data: suppliers } = useGetSuppliers();
 
   const { handleCurrency, handleToggleCalculate, toggleCurrency } =
     useHandleCurrency();
@@ -105,24 +111,29 @@ const DetailsProduct = () => {
                 </p>
               </PopoverContent>
             </Popover>
-            <Controller
-              control={form.control}
-              name="status"
-              render={({ field }) => {
-                const isChecked = field.value === "ACTIVE";
-                const toggleChecked = () => {
-                  field.onChange(isChecked ? "INACTIVE" : "ACTIVE");
-                  updateProductStatusMutation.mutate({
-                    id: product.id,
-                    status: isChecked ? "INACTIVE" : "ACTIVE",
-                  });
-                };
+            {user?.role === "ADMIN" && (
+              <Controller
+                control={form.control}
+                name="status"
+                render={({ field }) => {
+                  const isChecked = field.value === "ACTIVE";
+                  const toggleChecked = () => {
+                    field.onChange(isChecked ? "INACTIVE" : "ACTIVE");
+                    updateProductStatusMutation.mutate({
+                      id: product.id,
+                      status: isChecked ? "INACTIVE" : "ACTIVE",
+                    });
+                  };
 
-                return (
-                  <Switch checked={isChecked} onCheckedChange={toggleChecked} />
-                );
-              }}
-            />
+                  return (
+                    <Switch
+                      checked={isChecked}
+                      onCheckedChange={toggleChecked}
+                    />
+                  );
+                }}
+              />
+            )}
 
             <Badge
               className={cn(
@@ -136,10 +147,13 @@ const DetailsProduct = () => {
               {product.status === "ACTIVE" ? "Activo" : "Inactivo"}
             </Badge>
           </div>
-          <Button onClick={() => setOpen(true)}>
-            <FilePen />
-            <p>Editar</p>
-          </Button>
+
+          {user?.role === "ADMIN" && (
+            <Button onClick={() => setOpen(true)}>
+              <FilePen />
+              <p>Editar</p>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -236,14 +250,14 @@ const DetailsProduct = () => {
         <div className="flex flex-col items-start gap-2 bg-card p-4 rounded">
           <div className="flex items-center justify-between w-full gap-2">
             <p className="text-md font-semibold">Informacion general</p>
-            <Button
-              className="cursor-pointer"
-              variant="secondary"
-              onClick={() => setOpen(true)}
+
+            <Link
+              href={`/dashboard/transactions/${product.id}`}
+              className="flex items-center gap-2"
             >
-              <HistoryIcon />
+              <HistoryIcon className="h-5 w-5" />
               <p className="hidden lg:block">Ver Historial de Movimientos</p>
-            </Button>
+            </Link>
           </div>
 
           {product.barcode && (

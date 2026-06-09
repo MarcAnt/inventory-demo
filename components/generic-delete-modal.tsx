@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import { TrashIcon } from "lucide-react";
-import { useDeleteProduct } from "@/hooks/queries";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -14,19 +13,32 @@ import {
   DialogClose,
 } from "./ui/dialog";
 import { Button } from "./ui/button";
+import { UseMutationResult } from "@tanstack/react-query";
 
-const DeleteProductModal = ({ id }: { id: string }) => {
+type DeleteModalProps<T> = {
+  id: T;
+  deleteAction: () => UseMutationResult<null, Error, T, unknown>;
+  successMessage: string;
+  errorMessage: string;
+};
+
+const DeleteModal = <T,>({
+  id,
+  deleteAction,
+  successMessage,
+  errorMessage,
+}: DeleteModalProps<T>) => {
   const [open, setOpen] = useState(false);
-  const deleteProductMutation = useDeleteProduct();
+  const deleteMutation = deleteAction();
 
   const handleDelete = async () => {
     try {
-      await deleteProductMutation.mutateAsync(id);
-      toast.success("Producto eliminado exitosamente");
+      await deleteMutation.mutateAsync(id);
+      toast.success(successMessage ?? "Eliminado exitosamente");
       setOpen(false);
     } catch (error) {
       console.error(error);
-      toast.error("Error al eliminar el producto");
+      toast.error(errorMessage ?? "Error al eliminar");
     }
   };
 
@@ -62,4 +74,4 @@ const DeleteProductModal = ({ id }: { id: string }) => {
     </Dialog>
   );
 };
-export default DeleteProductModal;
+export default DeleteModal;

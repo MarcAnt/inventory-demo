@@ -12,6 +12,8 @@ import { CirclePlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { ProductsModal } from "./products-modal";
+import { usePathname } from "next/navigation";
+import { useGetUserProfile } from "@/hooks/queries";
 
 export function NavMain({
   items,
@@ -24,6 +26,9 @@ export function NavMain({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const { categories, suppliers } = useSidebar();
+  const pathname = usePathname();
+
+  const { data: userProfile } = useGetUserProfile();
 
   return (
     <>
@@ -31,14 +36,16 @@ export function NavMain({
         <SidebarGroupContent className="flex flex-col gap-2">
           <SidebarMenu>
             <SidebarMenuItem className="flex items-center gap-2">
-              <SidebarMenuButton
-                tooltip="Crear Nuevo Producto"
-                className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
-                onClick={() => setIsOpen(true)}
-              >
-                <CirclePlusIcon />
-                <span>Crear Nuevo Producto</span>
-              </SidebarMenuButton>
+              {userProfile?.role === "ADMIN" && (
+                <SidebarMenuButton
+                  tooltip="Crear Nuevo Producto"
+                  className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
+                  onClick={() => setIsOpen(true)}
+                >
+                  <CirclePlusIcon />
+                  <span>Crear Nuevo Producto</span>
+                </SidebarMenuButton>
+              )}
             </SidebarMenuItem>
           </SidebarMenu>
           <SidebarMenu>
@@ -46,7 +53,7 @@ export function NavMain({
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
                   tooltip={item.title}
-                  isActive={item.url === "/dashboard"}
+                  isActive={pathname.includes(item.url)}
                 >
                   {item.icon}
                   <Link

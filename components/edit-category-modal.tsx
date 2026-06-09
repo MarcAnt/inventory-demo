@@ -1,6 +1,5 @@
-"use client";
-
 import { Button } from "@/components/ui/button";
+import { Category } from "@/types";
 import {
   Dialog,
   DialogClose,
@@ -10,64 +9,64 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Controller, useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CategorySchema } from "@/schemas";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+
 import {
   Field,
   FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
-import z from "zod";
 import { toast } from "sonner";
-import { useCreateCategory } from "@/hooks/queries";
+import { useUpdateCategory } from "@/hooks/queries";
 
-type Props = {
-  open: boolean;
-  setIsOpen: (open: boolean) => void;
+type EditCategoryModalProps = {
+  category: Category;
+  isOpen: boolean;
+  setIsOpen: (value: boolean) => void;
 };
 
-type CategoryOmitId = Omit<z.infer<typeof CategorySchema>, "id">;
-
-const CategoriesModal = ({ open, setIsOpen }: Props) => {
-  const defaultValue: CategoryOmitId = {
-    name: "",
-    description: "",
-  };
-
+const EditCategoryModal = ({
+  category,
+  isOpen,
+  setIsOpen,
+}: EditCategoryModalProps) => {
   const form = useForm({
     resolver: zodResolver(CategorySchema.omit({ id: true })),
-    defaultValues: defaultValue,
-    mode: "onChange",
+    defaultValues: {
+      name: category?.name,
+      description: category.description,
+    },
   });
 
-  const createCategoryMutation = useCreateCategory();
+  const updateCategoryData = useUpdateCategory();
 
-  const onSubmit = async (data: CategoryOmitId) => {
+  const onSubmit = async (data: Omit<Category, "id">) => {
     try {
-      const parsed = await CategorySchema.omit({ id: true }).parseAsync(data);
-
-      await createCategoryMutation.mutateAsync(parsed);
-
-      toast.success("Categoría agregada exitosamente");
-      form.reset();
+      await updateCategoryData.mutateAsync({ ...data, id: category.id });
+      toast.success("Categoría actualizada exitosamente");
       setIsOpen(false);
     } catch (error) {
       console.error(error);
-      toast.error("Error al agregar la categoría");
+      toast.error("Error al actualizar la categoría");
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setIsOpen}>
-      <form onSubmit={form.handleSubmit(onSubmit)} id="category-form">
-        <DialogContent>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        id={`edit-category-form-${category.id}`}
+      >
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Nueva Categoría</DialogTitle>
+            <DialogTitle>Editar categoría</DialogTitle>
             <DialogDescription>
-              Crea una nueva categoría para tus productos.
+              Edita una categoría del inventario.
             </DialogDescription>
           </DialogHeader>
           <FieldGroup>
@@ -82,7 +81,7 @@ const CategoriesModal = ({ open, setIsOpen }: Props) => {
                     value={field.value ?? ""}
                     id={field.name}
                     aria-invalid={fieldState.invalid}
-                    placeholder="Nombre del producto"
+                    placeholder="Nombre de la categoría"
                     autoComplete="off"
                   />
                   {fieldState.invalid && (
@@ -91,13 +90,14 @@ const CategoriesModal = ({ open, setIsOpen }: Props) => {
                 </Field>
               )}
             />
+
             <Controller
               name="description"
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor={field.name}>Descripción</FieldLabel>
-                  <Input
+                  <Textarea
                     {...field}
                     value={field.value ?? ""}
                     id={field.name}
@@ -112,16 +112,16 @@ const CategoriesModal = ({ open, setIsOpen }: Props) => {
               )}
             />
           </FieldGroup>
+
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>
-              Cancelar
-            </DialogClose>
+            <DialogClose render={<Button variant="outline">Cancelar</Button>} />
+
             <Button
               type="submit"
-              form="category-form"
+              form={`edit-category-form-${category.id}`}
               disabled={form.formState.isSubmitting}
             >
-              Crear
+              Actualizar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -130,4 +130,4 @@ const CategoriesModal = ({ open, setIsOpen }: Props) => {
   );
 };
 
-export default CategoriesModal;
+export default EditCategoryModal;

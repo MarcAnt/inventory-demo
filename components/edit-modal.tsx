@@ -1,9 +1,9 @@
-import { Category, Products, Suppliers } from "@/types";
+import { Category, Product, Supplier } from "@/types";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ProductSchema } from "@/schemas";
-import { updateProduct } from "@/hooks/queries";
+import { useUpdateProduct } from "@/hooks/queries";
 import {
   Dialog,
   DialogClose,
@@ -46,13 +46,13 @@ const EditProductModal = ({
   isOpen,
   setIsOpen,
 }: {
-  product: Products;
+  product: Product;
   categories: Category[];
-  suppliers: Suppliers[];
+  suppliers: Supplier[];
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
 }) => {
-  const updateProductData = updateProduct();
+  const updateProductData = useUpdateProduct();
 
   const form = useForm({
     resolver: zodResolver(
@@ -63,7 +63,7 @@ const EditProductModal = ({
         suppliers: true,
       }),
     ),
-    defaultValues: {
+    values: {
       ...product,
       category_id: String(product.category_id),
       supplier_id: String(product.supplier_id),
@@ -73,12 +73,11 @@ const EditProductModal = ({
 
   const onSubmit = async (
     data: Omit<
-      Products,
+      Product,
       "updated_at" | "created_at" | "categories" | "suppliers"
     >,
   ) => {
     try {
-      //   console.log(data);
       await updateProductData.mutateAsync({ ...data, id: product.id });
       toast.success("Producto actualizado exitosamente");
       setIsOpen(false);
@@ -352,27 +351,31 @@ const EditProductModal = ({
             <Controller
               name="stock"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={field.name}>Stock</FieldLabel>
-                  <Input
-                    {...field}
-                    type="number"
-                    value={field.value ?? 0}
-                    id={field.name}
-                    aria-invalid={fieldState.invalid}
-                    placeholder="Stock Actual"
-                    autoComplete="off"
-                    onChange={(e) => {
-                      field.onChange(e.target.valueAsNumber);
-                    }}
-                  />
+              render={({ field, fieldState }) => {
+                console.log({ field });
 
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
-              )}
+                return (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor={field.name}>Stock</FieldLabel>
+                    <Input
+                      {...field}
+                      type="number"
+                      value={field.value ?? 0}
+                      id={field.name}
+                      aria-invalid={fieldState.invalid}
+                      placeholder="Stock Actual"
+                      autoComplete="off"
+                      onChange={(e) => {
+                        field.onChange(e.target.valueAsNumber);
+                      }}
+                    />
+
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                );
+              }}
             />
 
             <Controller

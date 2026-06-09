@@ -82,24 +82,34 @@ import {
 } from "lucide-react";
 import { ProductsModal } from "./products-modal";
 import CategoriesModal from "./categories-modal";
-import { Category, Products, Suppliers } from "@/types";
+import { Category, Product, Supplier } from "@/types";
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
 import { UseMutationResult, useQueryClient } from "@tanstack/react-query";
-import { deleteProduct, updateProduct, useUpdateStock } from "@/hooks/queries";
+import {
+  useDeleteProduct,
+  useGetUserProfile,
+  useUpdateProduct,
+  useUpdateStock,
+} from "@/hooks/queries";
 import Link from "next/link";
 import DataTableSearch from "./search-input";
-import DeleteProductModal from "./delete-modal";
 import EditProductModal from "./edit-modal";
 import { useHandleCurrency } from "@/hooks/use-handle-currency";
+import CategoriesDataTable from "./categories-data-table";
+import DeleteModal from "./generic-delete-modal";
+import SuppliersDataTable from "./suppliers-data-table";
+import { Separator } from "@/components/ui/separator";
 
 declare module "@tanstack/react-table" {
   interface TableMeta<TData> {
-    updateStock: () => UseMutationResult<
-      any[],
+    categories: Category[];
+    suppliers: Supplier[];
+    useUpdateStock: () => UseMutationResult<
+      Product[],
       Error,
       {
         id: string;
@@ -108,10 +118,13 @@ declare module "@tanstack/react-table" {
       unknown
     >;
     // setData: React.Dispatch<React.SetStateAction<TData[]>>;
-    categories: Category[];
-    suppliers: Suppliers[];
-    deleteProduct: () => UseMutationResult<null, Error, string, unknown>;
-    updateProduct: () => UseMutationResult<any[], Error, Products, unknown>;
+    useDeleteProduct: () => UseMutationResult<null, Error, string, unknown>;
+    useUpdateProduct: () => UseMutationResult<
+      Product[],
+      Error,
+      Product,
+      unknown
+    >;
     handleCurrency: (price: number) => number | string;
     toggleCurrency: string;
   }
@@ -141,12 +154,12 @@ const TableEditRow = ({
   categories,
   suppliers,
 }: {
-  product: Products;
+  product: Product;
   categories: Category[];
-  suppliers: Suppliers[];
+  suppliers: Supplier[];
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
-
+  const { data: userProfile } = useGetUserProfile();
   return (
     <>
       <DropdownMenu>
@@ -166,10 +179,13 @@ const TableEditRow = ({
         </div>
 
         <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem onClick={() => setIsOpen(true)}>
-            <SquarePenIcon />
-            Editar
-          </DropdownMenuItem>
+          {userProfile?.role === "ADMIN" && (
+            <DropdownMenuItem onClick={() => setIsOpen(true)}>
+              <SquarePenIcon />
+              Editar
+            </DropdownMenuItem>
+          )}
+
           <DropdownMenuItem>
             <Link href={`/dashboard/${product.name.split(" ").join("-")}`}>
               <div className="flex items-center gap-2">
@@ -180,7 +196,14 @@ const TableEditRow = ({
 
           <DropdownMenuSeparator />
 
-          <DeleteProductModal id={product.id} />
+          {userProfile?.role === "ADMIN" && (
+            <DeleteModal
+              id={product.id}
+              deleteAction={useDeleteProduct}
+              successMessage="Producto eliminado exitosamente"
+              errorMessage="Error al eliminar el producto"
+            />
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -195,7 +218,7 @@ const TableEditRow = ({
   );
 };
 
-const columns: ColumnDef<Products>[] = [
+const columns: ColumnDef<Product>[] = [
   {
     id: "drag",
     header: () => null,
@@ -275,7 +298,7 @@ const columns: ColumnDef<Products>[] = [
     cell: ({ row, table }) => {
       const stock = row.getValue<number>("stock");
       const min_stock = row.getValue<number>("min_stock");
-      const handleUpdateStock = table.options.meta?.updateStock();
+      const handleUpdateStock = table.options.meta?.useUpdateStock();
 
       const addStock = async (id: string, stock: number) => {
         handleUpdateStock?.mutateAsync({ id, stock: stock + 1 });
@@ -394,7 +417,7 @@ const columns: ColumnDef<Products>[] = [
     accessorKey: "Acciones",
     cell: ({ row, table }) => {
       const categories = (table.options.meta?.categories as Category[]) || [];
-      const suppliers = (table.options.meta?.suppliers as Suppliers[]) || [];
+      const suppliers = (table.options.meta?.suppliers as Supplier[]) || [];
 
       return (
         <TableEditRow
@@ -409,7 +432,7 @@ const columns: ColumnDef<Products>[] = [
   },
 ];
 
-function DraggableRow({ row }: { row: Row<Products> }) {
+function DraggableRow({ row }: { row: Row<Product> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
   });
@@ -438,16 +461,20 @@ export function DataTable({
   categories,
   suppliers,
 }: {
-  data: Products[];
+  data: Product[];
   categories: Category[];
-  suppliers: Suppliers[];
+  suppliers: Supplier[];
 }) {
   const [openCategoryModal, setOpenCategoryModal] = React.useState(false);
   const [open, setIsOpen] = React.useState(false);
+  const [currentTab, setCurrentTab] = React.useState<
+    "products" | "categories" | "suppliers"
+  >("products");
 
   const queryClient = useQueryClient();
   const [searchValue, setSearchValue] = React.useState("");
   const deferredSearchValue = React.useDeferredValue(searchValue);
+  const { data: userProfile } = useGetUserProfile();
 
   const { handleToggleCalculate, toggleCurrency, handleCurrency } =
     useHandleCurrency();
@@ -489,21 +516,21 @@ export function DataTable({
       // setData,
       categories: categories,
       suppliers: suppliers,
-      updateStock: useUpdateStock,
-      deleteProduct: deleteProduct,
-      updateProduct: updateProduct,
+      useUpdateStock: useUpdateStock,
+      useDeleteProduct: useDeleteProduct,
+      useUpdateProduct: useUpdateProduct,
       handleCurrency: handleCurrency,
       toggleCurrency: toggleCurrency,
     },
     initialState: {
       sorting: [
-        {
-          id: "name",
-          desc: false,
-        },
+        // {
+        //   id: "name",
+        //   desc: false,
+        // },
       ],
     },
-    getRowId: (row) => row.id.toString(),
+    getRowId: (row) => row.id,
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
@@ -518,7 +545,9 @@ export function DataTable({
     getFacetedUniqueValues: getFacetedUniqueValues(),
     onGlobalFilterChange: setSearchValue,
     globalFilterFn: "includesString",
+    autoResetAll: false,
   });
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (active && over && active.id !== over.id) {
@@ -528,19 +557,16 @@ export function DataTable({
       //   return arrayMove(data, oldIndex, newIndex);
       // });
 
-      queryClient.setQueryData(
-        ["products"],
-        (oldData: { data: Products[] }) => {
-          if (!oldData) return oldData;
+      queryClient.setQueryData(["products"], (oldData: { data: Product[] }) => {
+        if (!oldData) return oldData;
 
-          const oldIndex = dataIds.indexOf(active.id);
-          const newIndex = dataIds.indexOf(over.id);
-          return {
-            ...oldData,
-            data: arrayMove(oldData.data, oldIndex, newIndex),
-          };
-        },
-      );
+        const oldIndex = dataIds.indexOf(active.id);
+        const newIndex = dataIds.indexOf(over.id);
+        return {
+          ...oldData,
+          data: arrayMove(oldData.data, oldIndex, newIndex),
+        };
+      });
     }
   }
 
@@ -549,100 +575,115 @@ export function DataTable({
       <Tabs
         defaultValue="products"
         className="w-full flex-col justify-start gap-6"
+        onValueChange={setCurrentTab}
+        value={currentTab}
       >
         <div className="flex items-center justify-between px-4 lg:px-6">
-          {/* <Label htmlFor="view-selector" className="sr-only">
-            View
-          </Label>
-          <Select
-            defaultValue="products"
-            items={[
-              { label: "Productos", value: "products" },
-              { label: "Categorías", value: "categories" },
-            ]}
-          >
-            <SelectTrigger
-              className="flex w-fit @4xl/main:hidden"
-              size="sm"
-              id="view-selector"
-            >
-              <SelectValue placeholder="Select a view" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="products">Productos</SelectItem>
-                <SelectItem value="categories">Categorías</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select> */}
           <TabsList className="hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:bg-muted-foreground/30 **:data-[slot=badge]:px-1 @4xl/main:flex">
             <TabsTrigger value="products">Productos</TabsTrigger>
             <TabsTrigger value="categories">Categorías</TabsTrigger>
             <TabsTrigger value="suppliers">Proveedores</TabsTrigger>
           </TabsList>
-          <div className="flex items-center gap-2">
-            <Button className="text-xs" onClick={() => handleToggleCalculate()}>
-              <p>Convertir a {`${toggleCurrency === "$" ? "Bs." : "$"}`}</p>
-            </Button>
-
-            <DataTableSearch value={searchValue} onChange={setSearchValue} />
-
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={<Button variant="outline" size="sm" />}
-              >
-                <Columns3Icon data-icon="inline-start" />
-                Columnas
-                <ChevronDownIcon data-icon="inline-end" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-32">
-                {table
-                  .getAllColumns()
-                  .filter(
-                    (column) =>
-                      typeof column.accessorFn !== "undefined" &&
-                      column.getCanHide(),
-                  )
-                  .map((column) => {
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        className="capitalize"
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) =>
-                          column.toggleVisibility(!!value)
-                        }
-                      >
-                        {column.id}
-                      </DropdownMenuCheckboxItem>
-                    );
-                  })}
-              </DropdownMenuContent>
-
-              <Button
-                onClick={() => setOpenCategoryModal(true)}
+          <div className="flex items-center flex-wrap gap-2">
+            <Label htmlFor="view-selector" className="sr-only">
+              Vista
+            </Label>
+            <Select
+              defaultValue="products"
+              items={[
+                { label: "Productos", value: "products" },
+                { label: "Categorías", value: "categories" },
+                { label: "Proveedores", value: "suppliers" },
+              ]}
+            >
+              <SelectTrigger
+                className="flex w-fit @4xl/main:hidden"
                 size="sm"
-                variant="outline"
+                id="view-selector"
               >
-                <PlusIcon data-icon="inline-start" />
-                Agregar Categoría
-              </Button>
-
-              <Button
-                onClick={() => setIsOpen(true)}
-                size="sm"
-                variant="outline"
-              >
-                <PlusIcon data-icon="inline-start" />
-                Agregar Producto
-              </Button>
-            </DropdownMenu>
+                <SelectValue placeholder="Seleccionar vista" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="products">Productos</SelectItem>
+                  <SelectItem value="categories">Categorías</SelectItem>
+                  <SelectItem value="suppliers">Proveedores</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <TabsContent
           value="products"
           className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
         >
+          {currentTab === "products" && (
+            <div className="flex items-center flex-wrap gap-2">
+              <Button
+                className="text-xs"
+                onClick={() => handleToggleCalculate()}
+              >
+                <p>Convertir a {`${toggleCurrency === "$" ? "Bs." : "$"}`}</p>
+              </Button>
+              <DataTableSearch value={searchValue} onChange={setSearchValue} />
+
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={<Button variant="outline" size="sm" />}
+                >
+                  <Columns3Icon data-icon="inline-start" />
+                  Columnas
+                  <ChevronDownIcon data-icon="inline-end" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-32">
+                  {table
+                    .getAllColumns()
+                    .filter(
+                      (column) =>
+                        typeof column.accessorFn !== "undefined" &&
+                        column.getCanHide(),
+                    )
+                    .map((column) => {
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={column.id}
+                          className="capitalize"
+                          checked={column.getIsVisible()}
+                          onCheckedChange={(value) =>
+                            column.toggleVisibility(!!value)
+                          }
+                        >
+                          {column.id}
+                        </DropdownMenuCheckboxItem>
+                      );
+                    })}
+                </DropdownMenuContent>
+
+                {userProfile?.role === "ADMIN" && (
+                  <>
+                    <Button
+                      onClick={() => setOpenCategoryModal(true)}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <PlusIcon data-icon="inline-start" />
+                      Agregar Categoría
+                    </Button>
+
+                    <Button
+                      onClick={() => setIsOpen(true)}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <PlusIcon data-icon="inline-start" />
+                      Agregar Producto
+                    </Button>
+                  </>
+                )}
+              </DropdownMenu>
+            </div>
+          )}
+
           <div className="overflow-hidden rounded-lg border">
             <DndContext
               collisionDetection={closestCenter}
@@ -708,9 +749,25 @@ export function DataTable({
                     <TableRow>
                       <TableCell
                         colSpan={columns.length}
-                        className="h-24 text-center"
+                        className="h-24 text-center "
                       >
-                        No results.
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          No se encontraron productos. Puedes:
+                          <div className="flex items-center gap-2 mt-2">
+                            <Button
+                              onClick={() => setIsOpen(true)}
+                              size="sm"
+                              variant="outline"
+                            >
+                              <PlusIcon data-icon="inline-start" />
+                              Agregá un producto
+                            </Button>
+                            <Separator orientation="vertical" />
+                            <Link href="/inventory">
+                              Ver todos los productos
+                            </Link>
+                          </div>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )}
@@ -802,12 +859,12 @@ export function DataTable({
             </div>
           </div>
         </TabsContent>
-        <TabsContent value="categories" className="flex flex-col px-4 lg:px-6">
-          <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
+        <TabsContent value="categories">
+          <CategoriesDataTable data={categories} />
         </TabsContent>
 
-        <TabsContent value="suppliers" className="flex flex-col px-4 lg:px-6">
-          <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
+        <TabsContent value="suppliers">
+          <SuppliersDataTable data={suppliers} />
         </TabsContent>
       </Tabs>
       <ProductsModal

@@ -1,11 +1,17 @@
 import { z } from "zod";
-import { ProductSchema, SupplierSchema, CategorySchema } from "@/schemas";
+import { ProductSchema, SupplierSchema, CategorySchema, UserSchema, LoginSchema, TransactionSchema } from "@/schemas";
 
 type Category = z.infer<typeof CategorySchema>;
 
-type Products = z.infer<typeof ProductSchema>;
+type Product = z.infer<typeof ProductSchema>;
 
-type Suppliers = z.infer<typeof SupplierSchema>;
+type Supplier = z.infer<typeof SupplierSchema>;
+
+type User = z.infer<typeof UserSchema>;
+
+type Login = z.infer<typeof LoginSchema>;
+
+type Transaction = z.infer<typeof TransactionSchema>;
 
 
 interface Currency {
@@ -18,4 +24,4 @@ interface Currency {
   fechaActualizacion: string;
 }
 
-export type { Category, Products, Suppliers , Currency }
+export type { Category, Product, Supplier, User , Currency, Login, Transaction }

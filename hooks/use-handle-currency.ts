@@ -1,10 +1,10 @@
-import { getCurrentCurrency } from "./queries";
+import { useGetCurrentCurrency } from "./queries";
 import { useState } from "react";
 
 
 export function useHandleCurrency() {
     const [shouldCalculate, setShouldCalculate] = useState(false);
-  const { data: currentCurrency } = getCurrentCurrency();
+  const { data: currentCurrency } = useGetCurrentCurrency();
 
   const oficialBs = currentCurrency ? currentCurrency[0].promedio : 0;
   const paraleloBs = currentCurrency ? currentCurrency[1].promedio : 0;

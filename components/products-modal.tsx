@@ -27,8 +27,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { ProductSchema } from "@/schemas";
-import type { Category, Products, Suppliers } from "@/types";
-import { createProduct } from "@/hooks/queries";
+import type { Category, Product, Supplier } from "@/types";
+import { useCreateProduct } from "@/hooks/queries";
 import { Switch } from "@/components/ui/switch";
 import { useId } from "react";
 import {
@@ -40,13 +40,13 @@ import { Button } from "@/components/ui/button";
 import { InfoIcon } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
-type ProductOmitId = Omit<Products, "id">;
+type ProductOmitId = Omit<Product, "id">;
 
 type Props = {
   open: boolean;
   setIsOpen: (open: boolean) => void;
   categories: Category[];
-  suppliers: Suppliers[];
+  suppliers: Supplier[];
 };
 
 export const ProductsModal = ({
@@ -76,7 +76,7 @@ export const ProductsModal = ({
     mode: "onChange",
   });
 
-  const addProductMutation = createProduct();
+  const addProductMutation = useCreateProduct();
 
   const onSubmit = async (data: ProductOmitId) => {
     try {

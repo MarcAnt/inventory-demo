@@ -2,14 +2,10 @@
 
 import * as React from "react";
 
-import { NavDocuments } from "@/components/nav-documents";
 import { NavMain } from "@/components/nav-main";
-import { NavSecondary } from "@/components/nav-secondary";
-import { NavUser } from "@/components/nav-user";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -19,22 +15,13 @@ import {
   LayoutDashboardIcon,
   ListIcon,
   ChartBarIcon,
-  FolderIcon,
   UsersIcon,
-  CameraIcon,
-  FileTextIcon,
-  Settings2Icon,
-  CircleHelpIcon,
-  SearchIcon,
-  DatabaseIcon,
-  FileChartColumnIcon,
-  FileIcon,
-  CommandIcon,
 } from "lucide-react";
+import { useGetUserProfile } from "@/hooks/queries";
 
 const data = {
   user: {
-    name: "shadcn",
+    name: "Marcos",
     email: "m@example.com",
     avatar: "/avatars/shadcn.jpg",
   },
@@ -47,7 +34,7 @@ const data = {
     },
     {
       title: "Inventario",
-      url: "/products",
+      url: "/inventory",
       icon: <ListIcon />,
     },
     {
@@ -61,90 +48,13 @@ const data = {
       icon: <UsersIcon />,
     },
   ],
-  // navClouds: [
-  //   {
-  //     title: "Capture",
-  //     icon: <CameraIcon />,
-  //     isActive: true,
-  //     url: "#",
-  //     items: [
-  //       {
-  //         title: "Active Proposals",
-  //         url: "#",
-  //       },
-  //       {
-  //         title: "Archived",
-  //         url: "#",
-  //       },
-  //     ],
-  //   },
-  //   {
-  //     title: "Proposal",
-  //     icon: <FileTextIcon />,
-  //     url: "#",
-  //     items: [
-  //       {
-  //         title: "Active Proposals",
-  //         url: "#",
-  //       },
-  //       {
-  //         title: "Archived",
-  //         url: "#",
-  //       },
-  //     ],
-  //   },
-  //   {
-  //     title: "Prompts",
-  //     icon: <FileTextIcon />,
-  //     url: "#",
-  //     items: [
-  //       {
-  //         title: "Active Proposals",
-  //         url: "#",
-  //       },
-  //       {
-  //         title: "Archived",
-  //         url: "#",
-  //       },
-  //     ],
-  //   },
-  // ],
-  navSecondary: [
-    // {
-    //   title: "Settings",
-    //   url: "#",
-    //   icon: <Settings2Icon />,
-    // },
-    // {
-    //   title: "Get Help",
-    //   url: "#",
-    //   icon: <CircleHelpIcon />,
-    // },
-    // {
-    //   title: "Search",
-    //   url: "#",
-    //   icon: <SearchIcon />,
-    // },
-  ],
-  documents: [
-    // {
-    //   name: "Data Library",
-    //   url: "#",
-    //   icon: <DatabaseIcon />,
-    // },
-    // {
-    //   name: "Reports",
-    //   url: "#",
-    //   icon: <FileChartColumnIcon />,
-    // },
-    // {
-    //   name: "Word Assistant",
-    //   url: "#",
-    //   icon: <FileIcon />,
-    // },
-  ],
 };
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { data: userProfile } = useGetUserProfile();
+  const navMain =
+    userProfile?.role === "STAFF"
+      ? data.navMain.filter((item) => item.title !== "Usuarios")
+      : data.navMain;
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -154,19 +64,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="data-[slot=sidebar-menu-button]:p-1.5!"
               render={<a href="#" />}
             >
-              <span className="text-base font-semibold">Inventory Demo</span>
+              <span className="text-base font-semibold">Inventario Demo</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        {/* <NavDocuments items={data.documents} /> */}
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavMain items={navMain} />
       </SidebarContent>
-      {/* <SidebarFooter>
-        <NavUser user={data.user} />
-      </SidebarFooter> */}
     </Sidebar>
   );
 }

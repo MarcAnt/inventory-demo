@@ -24,8 +24,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { PanelLeftIcon } from "lucide-react";
-import type { Category, Suppliers } from "@/types";
-import { getCategories, getSuppliers } from "@/hooks/queries";
+import type { Category, Supplier } from "@/types";
+import { useGetCategories, useGetSuppliers } from "@/hooks/queries";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
@@ -43,7 +43,7 @@ type SidebarContextProps = {
   isMobile: boolean;
   toggleSidebar: () => void;
   categories: Category[] | undefined;
-  suppliers: Suppliers[] | undefined;
+  suppliers: Supplier[] | undefined;
 };
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
@@ -94,8 +94,8 @@ function SidebarProvider({
     [setOpenProp, open],
   );
 
-  const categories = getCategories().data;
-  const suppliers = getSuppliers().data;
+  const { data: categories } = useGetCategories();
+  const { data: suppliers } = useGetSuppliers();
 
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {

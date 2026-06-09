@@ -42,7 +42,6 @@ export const ProductSchema = z.object({
 
 });
 
-
 export const CategorySchema = z.object({
   id: z.string(),
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
@@ -51,5 +50,37 @@ export const CategorySchema = z.object({
 
 export const SupplierSchema = z.object({
   id: z.string(),
-  name: z.string().min(3, "El nombre debe tener al menos 3 caracteres")
+  name: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
+  description: z.string().min(3, "La descripción debe tener al menos 3 caracteres").optional(),
+
 });
+
+export const UserSchema = z.object({
+  id: z.string().optional(),
+  email: z.email("Por favor, ingresa un email válido"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  repeat_password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  first_name: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
+  last_name: z.string().min(3, "El apellido debe tener al menos 3 caracteres"),
+}).refine((data) => data.password === data.repeat_password, {
+  message: "Las contraseñas no coinciden",
+  path: ["repeat_password"],
+});
+
+
+export const LoginSchema = z.object({
+  email: z.email("Por favor, ingresa un email válido"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+})
+ 
+export const TransactionSchema = z.object({
+  id: z.string(),
+  product_id: z.coerce.number({ error: "Por favor, seleccione un producto" }).nonnegative().refine(value => value > 0, { message: "Por favor, seleccione un producto" }),
+  type: z.enum(["IN", "OUT", "DAMAGE", "ADJUSTMENT"]),
+  quantity: z.number({
+    error: "La cantidad debe ser un número",
+  }).nonnegative("La cantidad debe ser mayor o igual a 0"),
+ 
+  user_id: z.string().min(1, "El usuario debe tener al menos 1 caracter").optional(),
+  created_at: z.coerce.date().optional(),
+})

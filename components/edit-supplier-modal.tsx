@@ -1,6 +1,5 @@
-"use client";
-
 import { Button } from "@/components/ui/button";
+import { Supplier } from "@/types";
 import {
   Dialog,
   DialogClose,
@@ -10,64 +9,64 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Controller, useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CategorySchema } from "@/schemas";
+import { SupplierSchema } from "@/schemas";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+
 import {
   Field,
   FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
-import z from "zod";
 import { toast } from "sonner";
-import { useCreateCategory } from "@/hooks/queries";
+import { useUpdateSupplier } from "@/hooks/queries";
 
-type Props = {
-  open: boolean;
-  setIsOpen: (open: boolean) => void;
+type EditSupplierModalProps = {
+  supplier: Supplier;
+  isOpen: boolean;
+  setIsOpen: (value: boolean) => void;
 };
 
-type CategoryOmitId = Omit<z.infer<typeof CategorySchema>, "id">;
-
-const CategoriesModal = ({ open, setIsOpen }: Props) => {
-  const defaultValue: CategoryOmitId = {
-    name: "",
-    description: "",
-  };
-
+const EditSupplierModal = ({
+  supplier,
+  isOpen,
+  setIsOpen,
+}: EditSupplierModalProps) => {
   const form = useForm({
-    resolver: zodResolver(CategorySchema.omit({ id: true })),
-    defaultValues: defaultValue,
-    mode: "onChange",
+    resolver: zodResolver(SupplierSchema.omit({ id: true })),
+    defaultValues: {
+      name: supplier?.name,
+      description: supplier.description,
+    },
   });
 
-  const createCategoryMutation = useCreateCategory();
+  const updateSupplierData = useUpdateSupplier();
 
-  const onSubmit = async (data: CategoryOmitId) => {
+  const onSubmit = async (data: Omit<Supplier, "id">) => {
     try {
-      const parsed = await CategorySchema.omit({ id: true }).parseAsync(data);
-
-      await createCategoryMutation.mutateAsync(parsed);
-
-      toast.success("Categoría agregada exitosamente");
-      form.reset();
+      await updateSupplierData.mutateAsync({ ...data, id: supplier.id });
+      toast.success("Proveedor actualizado exitosamente");
       setIsOpen(false);
     } catch (error) {
       console.error(error);
-      toast.error("Error al agregar la categoría");
+      toast.error("Error al actualizar el proveedor");
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setIsOpen}>
-      <form onSubmit={form.handleSubmit(onSubmit)} id="category-form">
-        <DialogContent>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        id={`edit-supplier-form-${supplier.id}`}
+      >
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Nueva Categoría</DialogTitle>
+            <DialogTitle>Editar proveedor</DialogTitle>
             <DialogDescription>
-              Crea una nueva categoría para tus productos.
+              Edita un proveedor del inventario.
             </DialogDescription>
           </DialogHeader>
           <FieldGroup>
@@ -82,7 +81,7 @@ const CategoriesModal = ({ open, setIsOpen }: Props) => {
                     value={field.value ?? ""}
                     id={field.name}
                     aria-invalid={fieldState.invalid}
-                    placeholder="Nombre del producto"
+                    placeholder="Nombre del proveedor"
                     autoComplete="off"
                   />
                   {fieldState.invalid && (
@@ -91,18 +90,19 @@ const CategoriesModal = ({ open, setIsOpen }: Props) => {
                 </Field>
               )}
             />
+
             <Controller
               name="description"
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor={field.name}>Descripción</FieldLabel>
-                  <Input
+                  <Textarea
                     {...field}
                     value={field.value ?? ""}
                     id={field.name}
                     aria-invalid={fieldState.invalid}
-                    placeholder="Descripción de la categoría"
+                    placeholder="Descripción del proveedor"
                     autoComplete="off"
                   />
                   {fieldState.invalid && (
@@ -112,16 +112,16 @@ const CategoriesModal = ({ open, setIsOpen }: Props) => {
               )}
             />
           </FieldGroup>
+
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>
-              Cancelar
-            </DialogClose>
+            <DialogClose render={<Button variant="outline">Cancelar</Button>} />
+
             <Button
               type="submit"
-              form="category-form"
+              form={`edit-supplier-form-${supplier.id}`}
               disabled={form.formState.isSubmitting}
             >
-              Crear
+              Actualizar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -130,4 +130,4 @@ const CategoriesModal = ({ open, setIsOpen }: Props) => {
   );
 };
 
-export default CategoriesModal;
+export default EditSupplierModal;
